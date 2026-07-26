@@ -17,6 +17,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.GridLayoutManager
 import be.miro.onecast.R
 import be.miro.onecast.databinding.ActivityMainBinding
+import be.miro.onecast.ui.downloads.DownloadsActivity
 import be.miro.onecast.ui.player.PlayerActivity
 import be.miro.onecast.ui.podcast.PodcastActivity
 import be.miro.onecast.ui.search.SearchActivity
@@ -52,7 +53,15 @@ class MainActivity : MediaActivity() {
 
     override fun onResume() {
         super.onResume()
-        lifecycleScope.launch { repository.refreshStalePodcasts() }
+        lifecycleScope.launch {
+            repository.refreshStalePodcasts()
+            // Once per process: clear out download files left behind by an unsubscribe or a crash,
+            // and forget downloads whose file is gone.
+            if (!prunedDownloads) {
+                prunedDownloads = true
+                repository.pruneDownloads(downloads.activePaths())
+            }
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -64,6 +73,10 @@ class MainActivity : MediaActivity() {
         return when (item.itemId) {
             R.id.action_add -> {
                 startActivity(Intent(this, SearchActivity::class.java))
+                true
+            }
+            R.id.action_downloads -> {
+                DownloadsActivity.start(this)
                 true
             }
             R.id.action_settings -> {
@@ -101,5 +114,10 @@ class MainActivity : MediaActivity() {
         ) {
             requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    private companion object {
+        /** Process-wide, not per-instance: the sweep only needs to happen once per app start. */
+        var prunedDownloads = false
     }
 }

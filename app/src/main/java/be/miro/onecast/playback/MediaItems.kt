@@ -6,6 +6,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import be.miro.onecast.data.Episode
 import be.miro.onecast.data.Podcast
+import java.io.File
 
 /** Builds Media3 [MediaItem]s, carrying the episode id as the media id. */
 object MediaItems {
@@ -24,9 +25,16 @@ object MediaItems {
             .build()
         return MediaItem.Builder()
             .setMediaId(episode.id.toString())
-            .setUri(episode.audioUrl)
+            .setUri(localUri(episode) ?: Uri.parse(episode.audioUrl))
             .setMediaMetadata(metadata)
             .build()
+    }
+
+    /** A downloaded episode plays from disk; anything else streams. */
+    private fun localUri(episode: Episode): Uri? {
+        val path = episode.downloadPath ?: return null
+        val file = File(path)
+        return if (file.exists()) Uri.fromFile(file) else null
     }
 
     fun episodeId(mediaItem: MediaItem?): Long? = mediaItem?.mediaId?.toLongOrNull()

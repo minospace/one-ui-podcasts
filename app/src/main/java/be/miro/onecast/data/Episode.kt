@@ -40,4 +40,13 @@ data class Episode(
     val chapters: List<Chapter> = emptyList(),
     /** Podcasting 2.0 JSON chapters URL, fetched lazily when none are inline. */
     val chaptersUrl: String? = null,
+    /**
+     * Absolute path of the downloaded audio file, or null when the episode isn't downloaded.
+     * Only ever set by an explicit user download — nothing downloads on its own.
+     */
+    val downloadPath: String? = null,
+    /** Size on disk of [downloadPath], in bytes. */
+    val downloadSizeBytes: Long = 0,
+    /** When the download finished (epoch millis) — newest first in the Downloads list. */
+    val downloadedAt: Long = 0,
 )

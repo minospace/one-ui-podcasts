@@ -1,5 +1,6 @@
 package be.miro.onecast.data
 
+import be.miro.onecast.download.DownloadStore
 import be.miro.onecast.feed.ChaptersClient
 import be.miro.onecast.feed.FeedFetcher
 import be.miro.onecast.feed.ItunesSearchClient
@@ -7,12 +8,14 @@ import be.miro.onecast.feed.ParsedFeed
 import be.miro.onecast.feed.PodcastSearchResult
 import kotlinx.coroutines.flow.Flow
 import okhttp3.OkHttpClient
+import java.io.File
 
 /** Single source of truth: wraps the DAOs and the network feed/search clients. */
 class PodcastRepository(
     private val podcastDao: PodcastDao,
     private val episodeDao: EpisodeDao,
     private val queueDao: QueueDao,
+    private val downloadStore: DownloadStore,
     httpClient: OkHttpClient = OkHttpClient(),
 ) {
     private val feedFetcher = FeedFetcher(httpClient)
@@ -73,11 +76,54 @@ class PodcastRepository(
         }
     }
 
-    suspend fun unsubscribe(podcastId: Long) = podcastDao.deleteById(podcastId)
+    /** Unsubscribing throws away the episode rows, so their downloaded files go with them. */
+    suspend fun unsubscribe(podcastId: Long) {
+        for (episode in episodeDao.getDownloadedForPodcast(podcastId)) {
+            downloadStore.delete(episode.downloadPath)
+        }
+        podcastDao.deleteById(podcastId)
+    }
+
+    // ── Downloads ──────────────────────────────────────────────────────────
+
+    fun observeDownloads(): Flow<List<EpisodeWithPodcast>> = episodeDao.observeDownloaded()
+    fun observeDownloadedEpisodeIds(): Flow<List<Long>> = episodeDao.observeDownloadedIds()
+
+    /** Records a completed download. */
+    suspend fun setDownloaded(episodeId: Long, path: String, sizeBytes: Long) =
+        episodeDao.setDownload(episodeId, path, sizeBytes, System.currentTimeMillis())
+
+    /** Deletes an episode's downloaded audio; the episode itself (and its progress) stays. */
+    suspend fun deleteDownload(episodeId: Long) {
+        val episode = episodeDao.getById(episodeId) ?: return
+        downloadStore.delete(episode.downloadPath)
+        episodeDao.setDownload(episodeId, null, 0, 0)
+    }
+
+    suspend fun deleteAllDownloads() {
+        for (episode in episodeDao.getDownloaded()) {
+            downloadStore.delete(episode.downloadPath)
+            episodeDao.setDownload(episode.id, null, 0, 0)
+        }
+    }
+
+    /**
+     * Drops files in the download directory that no episode row points at any more (left behind by
+     * an unsubscribe or a crash mid-download), and clears rows whose file has vanished.
+     */
+    suspend fun pruneDownloads(activePaths: Collection<String> = emptyList()) {
+        val downloaded = episodeDao.getDownloaded()
+        val known = downloaded.mapNotNull { it.downloadPath }
+        downloadStore.deleteExcept(known + activePaths)
+        for (episode in downloaded) {
+            val path = episode.downloadPath ?: continue
+            if (!File(path).exists()) episodeDao.setDownload(episode.id, null, 0, 0)
+        }
+    }
 
     // ── Up Next queue ──────────────────────────────────────────────────────
 
-    fun observeQueue(): Flow<List<QueuedEpisode>> = queueDao.observeQueue()
+    fun observeQueue(): Flow<List<EpisodeWithPodcast>> = queueDao.observeQueue()
     fun observeQueueEpisodeIds(): Flow<List<Long>> = queueDao.observeEpisodeIds()
 
     /** Append an episode to the end of the queue (no-op if already queued). */

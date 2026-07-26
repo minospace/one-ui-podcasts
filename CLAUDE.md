@@ -52,11 +52,14 @@ app/src/main/java/be/miro/onecast/
   data/        Room entities (Podcast, Episode), DAOs, AppDatabase, PodcastRepository
   feed/        ItunesSearchClient (iTunes Search API), RssParser (XmlPullParser), FeedFetcher
   playback/    PlaybackService (Media3 MediaSessionService), PlayerConnection, MediaItems
+  download/    EpisodeDownloader (queue + OkHttp), DownloadService (foreground + live
+               notification), DownloadStore (files), DownloadNotifications
   widget/      OnecastWidgetProvider, WidgetState — home-screen widget
   ui/          MediaActivity (base), MainActivity (home grid), Format, SquareImageView
     search/    SearchActivity + SearchResultAdapter   — add a podcast (iTunes search + RSS URL)
     podcast/   PodcastActivity + EpisodeAdapter        — detail screen + episode list
     player/    PlayerActivity, MiniPlayerView          — now-playing UI
+    downloads/ DownloadsActivity + DownloadsAdapter    — offline episodes + downloads in flight
     subscriptions/ PodcastGridAdapter
 ```
 
@@ -149,6 +152,16 @@ emulator @podcast_test -no-window -no-audio -no-snapshot -no-boot-anim \
 **Implemented**: add podcast (iTunes search + RSS URL), subscriptions grid, podcast detail with
 swipe-refresh, streaming playback (background service, lock-screen controls, skip ±, speed),
 mini-player + full player with a shared-element artwork transition, mark played (manual/bulk/auto),
-resume positions, home-screen widget, light/dark following the system.
+resume positions, home-screen widget, light/dark following the system, episode downloads/offline
+playback.
 
-**Deliberately deferred** (don't add speculatively): episode downloads/offline
+**Downloads**: strictly user-initiated — there is no auto-download and none should be added.
+`EpisodeDownloader` runs one download at a time off an in-memory queue (progress is far too chatty
+to persist; only the finished file's path/size/timestamp land on the `episodes` row).
+`DownloadService` exists solely to hold the foreground-service notification that mirrors that queue
+— it stops itself the moment nothing is queued or running. A download writes to a `.part` file that
+is renamed into place only on success, so a partial file is never mistaken for a finished one; any
+failure (HTTP error, truncated transfer, OkHttp read timeout, or the stall watchdog that fires when
+bytes stop arriving for 60s) deletes the partial, notifies the user with the reason, and leaves a
+retry row on the Downloads screen. `MainActivity` sweeps orphaned files once per process
+(`PodcastRepository.pruneDownloads`), which is what catches leftovers from a process death.

@@ -17,7 +17,7 @@ interface QueueDao {
             "INNER JOIN podcasts p ON e.podcastId = p.id " +
             "ORDER BY q.position ASC",
     )
-    fun observeQueue(): Flow<List<QueuedEpisode>>
+    fun observeQueue(): Flow<List<EpisodeWithPodcast>>
 
     /** Just the queued episode ids (cheap membership check for episode lists). */
     @Query("SELECT episodeId FROM queue ORDER BY position ASC")

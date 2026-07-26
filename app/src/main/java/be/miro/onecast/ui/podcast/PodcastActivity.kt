@@ -18,8 +18,10 @@ import be.miro.onecast.R
 import be.miro.onecast.data.Episode
 import be.miro.onecast.data.Podcast
 import be.miro.onecast.databinding.ActivityPodcastBinding
+import be.miro.onecast.download.DownloadState
 import be.miro.onecast.playback.MediaItems
 import be.miro.onecast.ui.MediaActivity
+import be.miro.onecast.ui.downloads.DownloadsActivity
 import be.miro.onecast.ui.player.PlayerActivity
 import be.miro.onecast.ui.queue.QueueActivity
 import kotlinx.coroutines.launch
@@ -95,6 +97,14 @@ class PodcastActivity : MediaActivity() {
                         queuedIds = ids.toHashSet()
                     }
                 }
+                launch {
+                    downloads.tasks.collect { tasks ->
+                        adapter.setDownloadingIds(
+                            tasks.filter { it.state != DownloadState.FAILED }
+                                .mapTo(HashSet()) { it.episodeId },
+                        )
+                    }
+                }
             }
         }
     }
@@ -127,7 +137,7 @@ class PodcastActivity : MediaActivity() {
         lifecycleScope.launch { repository.setPlayed(episode.id, !episode.isPlayed) }
     }
 
-    /** Long-press an episode: quick queue actions (play next / add / remove). */
+    /** Long-press an episode: quick queue and download actions. */
     private fun showEpisodeMenu(episode: Episode, anchor: View) {
         val popup = PopupMenu(this, anchor)
         popup.menu.add(0, MENU_PLAY_NEXT, 0, R.string.queue_play_next)
@@ -136,11 +146,31 @@ class PodcastActivity : MediaActivity() {
         } else {
             popup.menu.add(0, MENU_ADD, 1, R.string.queue_add)
         }
+        when {
+            downloads.isPending(episode.id) ->
+                popup.menu.add(0, MENU_CANCEL_DOWNLOAD, 2, R.string.download_cancel_download)
+            episode.downloadPath != null ->
+                popup.menu.add(0, MENU_DELETE_DOWNLOAD, 2, R.string.downloads_delete)
+            else -> popup.menu.add(0, MENU_DOWNLOAD, 2, R.string.downloads_download)
+        }
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_PLAY_NEXT -> queueAction(episode, R.string.queue_added_next) { repository.playNext(it) }
                 MENU_ADD -> queueAction(episode, R.string.queue_added) { repository.addToQueue(it) }
                 MENU_REMOVE -> queueAction(episode, R.string.queue_removed) { repository.removeFromQueue(it) }
+                MENU_DOWNLOAD -> {
+                    downloads.enqueue(episode.id)
+                    toast(getString(R.string.downloads_started))
+                    true
+                }
+                MENU_CANCEL_DOWNLOAD -> {
+                    downloads.cancel(episode.id)
+                    toast(getString(R.string.downloads_cancelled))
+                    true
+                }
+                MENU_DELETE_DOWNLOAD -> queueAction(episode, R.string.downloads_deleted) {
+                    repository.deleteDownload(it)
+                }
                 else -> false
             }
         }
@@ -192,6 +222,10 @@ class PodcastActivity : MediaActivity() {
         }
         R.id.action_queue -> {
             QueueActivity.start(this)
+            true
+        }
+        R.id.action_downloads -> {
+            DownloadsActivity.start(this)
             true
         }
         R.id.action_hide_played -> {
@@ -251,6 +285,9 @@ class PodcastActivity : MediaActivity() {
         private const val MENU_PLAY_NEXT = 1
         private const val MENU_ADD = 2
         private const val MENU_REMOVE = 3
+        private const val MENU_DOWNLOAD = 4
+        private const val MENU_CANCEL_DOWNLOAD = 5
+        private const val MENU_DELETE_DOWNLOAD = 6
 
         fun start(context: Context, podcastId: Long) {
             context.startActivity(

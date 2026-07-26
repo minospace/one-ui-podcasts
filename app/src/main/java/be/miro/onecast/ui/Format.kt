@@ -32,6 +32,18 @@ object Format {
         }
     }
 
+    /** Download sizes, e.g. "38.2 MB" or "412 KB". */
+    fun fileSize(bytes: Long): String {
+        if (bytes <= 0) return "0 MB"
+        val mb = bytes / 1_048_576.0
+        return when {
+            mb >= 1000 -> String.format(Locale.US, "%.1f GB", mb / 1024)
+            mb >= 10 -> String.format(Locale.US, "%.0f MB", mb)
+            mb >= 1 -> String.format(Locale.US, "%.1f MB", mb)
+            else -> String.format(Locale.US, "%.0f KB", bytes / 1024.0)
+        }
+    }
+
     fun relativeDate(epochMs: Long): String {
         if (epochMs <= 0) return ""
         return DateUtils.getRelativeTimeSpanString(

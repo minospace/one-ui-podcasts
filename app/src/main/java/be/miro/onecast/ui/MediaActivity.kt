@@ -5,6 +5,8 @@ import androidx.appcompat.app.AppCompatActivity
 import be.miro.onecast.appSettings
 import be.miro.onecast.data.AppSettings
 import be.miro.onecast.data.PodcastRepository
+import be.miro.onecast.download.EpisodeDownloader
+import be.miro.onecast.episodeDownloads
 import be.miro.onecast.playback.PlayerConnection
 import be.miro.onecast.podcastRepository
 import dev.oneuiproject.oneui.layout.ToolbarLayout
@@ -18,6 +20,8 @@ abstract class MediaActivity : AppCompatActivity() {
     protected val repository: PodcastRepository get() = podcastRepository
 
     protected val settings: AppSettings get() = appSettings
+
+    protected val downloads: EpisodeDownloader get() = episodeDownloads
 
     private var amoledApplied = false
 

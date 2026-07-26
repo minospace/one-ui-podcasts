@@ -24,6 +24,37 @@
     <string name="queue_added_next">Playing next</string>
     <string name="queue_removed">Removed from Up Next</string>
 
+    <!-- Downloads -->
+    <string name="downloads_title">Downloads</string>
+    <string name="action_downloads">Downloads</string>
+    <string name="downloads_empty">Nothing downloaded</string>
+    <string name="downloads_empty_hint">Long-press an episode and choose Download to keep it on your phone. Episodes are only ever downloaded when you ask.</string>
+    <string name="downloads_download">Download</string>
+    <string name="downloads_delete">Delete download</string>
+    <string name="downloads_delete_message">Delete the downloaded file for \"%1$s\"? The episode stays in the list and can be streamed or downloaded again.</string>
+    <string name="downloads_delete_all">Delete all downloads</string>
+    <plurals name="downloads_delete_all_message">
+        <item quantity="one">Delete %1$d downloaded episode (%2$s)?</item>
+        <item quantity="other">Delete all %1$d downloaded episodes (%2$s)?</item>
+    </plurals>
+    <string name="downloads_deleted">Download deleted</string>
+    <string name="downloads_deleted_all">All downloads deleted</string>
+    <string name="downloads_started">Downloading…</string>
+    <string name="downloads_cancelled">Download cancelled</string>
+    <string name="downloads_failed_row">Download failed · %1$s · Tap to retry</string>
+    <string name="download_cancel">Cancel</string>
+    <string name="download_cancel_all">Cancel all</string>
+    <string name="download_cancel_download">Cancel download</string>
+    <string name="download_preparing">Preparing download…</string>
+    <string name="download_waiting">Waiting to download…</string>
+    <string name="download_progress_bytes">%1$s of %2$s</string>
+    <string name="download_queue_count">%1$d in queue</string>
+    <string name="download_failed">Download failed</string>
+    <string name="download_failed_detail">%1$s · %2$s</string>
+    <string name="download_this_episode">This episode</string>
+    <string name="download_channel_progress">Downloads</string>
+    <string name="download_channel_alerts">Download problems</string>
+
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="action_settings">Settings</string>
