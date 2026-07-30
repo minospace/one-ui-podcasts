@@ -1,13 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Filled accent circle behind the widget's play/pause icon — the same treatment the full-screen
-     player gives its primary control (bg_play_circle), but with the widget's own concrete /
-     Material You colours instead of theme attributes, and a concrete ripple colour since
-     ?attr/colorControlHighlight would resolve against the launcher's theme. -->
-<ripple xmlns:android="http://schemas.android.com/apk/res/android"
-    android:color="@color/widget_ripple">
-    <item>
-        <shape android:shape="oval">
-            <solid android:color="@color/widget_accent" />
-        </shape>
-    </item>
-</ripple>
+<!-- Filled accent circle behind the widget's play/pause icon (RemoteViews-safe, no ripple). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/app_primary" />
+</shape>
