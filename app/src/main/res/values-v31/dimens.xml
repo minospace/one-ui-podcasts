@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ lets the launcher declare the corner radius it rounds widgets to (capped at
+         28dp by the platform). Matching it means the card never shows a sliver of mismatched
+         corner against the launcher's own clipping — the Material You house style. -->
+    <dimen name="widget_card_radius">@android:dimen/system_app_widget_background_radius</dimen>
+</resources>
