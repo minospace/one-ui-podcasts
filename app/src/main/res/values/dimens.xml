@@ -2,10 +2,4 @@
 <resources>
     <!-- Gap between the screen edge and a floating One UI grouped-preference card (Settings). -->
     <dimen name="settings_card_horizontal_margin">16dp</dimen>
-
-    <!-- Home-screen widget corner radii. On API 31+ the card radius is overridden in values-v31 to
-         the launcher-supplied system_app_widget_background_radius, so the widget's corners match
-         every other widget on the home screen (Material You). This is the pre-12 fallback. -->
-    <dimen name="widget_card_radius">24dp</dimen>
-    <dimen name="widget_art_radius">16dp</dimen>
 </resources>
