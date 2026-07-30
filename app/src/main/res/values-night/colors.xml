@@ -5,9 +5,17 @@
     <!-- Lighter than the near-black dark window background (#171717) so Settings cards read. -->
     <color name="app_settings_card">#FF242426</color>
 
-    <!-- Dark-mode widget palette (see values/colors.xml for why these are concrete colours). -->
+    <!-- Dark-mode widget palette (see values/colors.xml for why these are concrete colours, and for
+         where the Android 12+ Material You variants live). -->
+    <color name="widget_surface">#FF252528</color>
+    <color name="widget_surface_stroke">#33AAAAAA</color>
     <color name="widget_text_primary">#FFF3F3F3</color>
     <color name="widget_text_secondary">#99FFFFFF</color>
+    <color name="widget_control_container">#1FAAAAAA</color>
     <color name="widget_control">#FFF0F0F0</color>
+    <color name="widget_accent">@color/app_primary</color>
+    <color name="widget_progress_track">#33AAAAAA</color>
+    <color name="widget_art_placeholder">#22AAAAAA</color>
     <color name="widget_icon_muted">#80FFFFFF</color>
+    <color name="widget_ripple">#26FFFFFF</color>
 </resources>
