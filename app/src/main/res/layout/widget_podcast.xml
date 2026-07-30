@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Home-screen widget. All colours are concrete resources (see values/colors.xml) rather than
      ?android:attr/* theme attributes, because a widget is inflated against the launcher's theme,
-     not the app's. -->
+     not the app's. On Android 12+ those resources resolve to the wallpaper-derived Material You
+     palette (values-v31/), so the widget tints itself the way Google's widgets do.
+
+     The transport controls mirror the full-screen player (activity_player.xml): all three are the
+     same round container (bg_widget_control, the widget's copy of bg_round_gray) carrying a
+     same-coloured glyph, with the play/pause larger than the skips — scaled down to fit a
+     two-cell widget. -->
+
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/widget_root"
@@ -23,7 +30,7 @@
             android:id="@+id/widget_art"
             android:layout_width="56dp"
             android:layout_height="56dp"
-            android:background="@drawable/bg_art_placeholder"
+            android:background="@drawable/bg_widget_art"
             android:contentDescription="@null"
             android:padding="10dp"
             android:scaleType="centerCrop"
@@ -62,35 +69,37 @@
 
         <ImageButton
             android:id="@+id/widget_skip_back"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:background="@android:color/transparent"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_widget_control"
             android:contentDescription="@string/widget_skip_back"
             android:scaleType="centerInside"
             android:src="@drawable/ic_widget_replay"
+            android:tint="@color/widget_control"
             android:visibility="gone" />
 
         <ImageButton
             android:id="@+id/widget_play_pause"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
             android:layout_marginHorizontal="4dp"
-            android:background="@drawable/bg_widget_play"
+            android:background="@drawable/bg_widget_control"
             android:contentDescription="@string/widget_play_pause"
-            android:padding="13dp"
+            android:padding="14dp"
             android:scaleType="fitCenter"
-            android:src="@drawable/ic_play"
-            android:tint="@color/app_on_primary"
+            android:src="@drawable/ic_play_rounded"
+            android:tint="@color/widget_control"
             android:visibility="gone" />
 
         <ImageButton
             android:id="@+id/widget_skip_forward"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:background="@android:color/transparent"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_widget_control"
             android:contentDescription="@string/widget_skip_forward"
             android:scaleType="centerInside"
             android:src="@drawable/ic_widget_forward"
+            android:tint="@color/widget_control"
             android:visibility="gone" />
     </LinearLayout>
 
@@ -115,11 +124,11 @@
             android:id="@+id/widget_progress"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="0dp"
-            android:layout_height="4dp"
+            android:layout_height="5dp"
             android:layout_marginHorizontal="10dp"
             android:layout_weight="1"
             android:max="1000"
-            android:progressDrawable="@drawable/mini_progress" />
+            android:progressDrawable="@drawable/widget_progress" />
 
         <TextView
             android:id="@+id/widget_duration"

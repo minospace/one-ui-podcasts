@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Round container shared by all three of the widget's transport controls — the widget's copy of
+     the player's bg_round_gray, so the widget's buttons read as the same family. Kept separate
+     because both colours have to be concrete: bg_round_gray's ?attr/colorControlHighlight and
+     app_chip_surface would resolve against the *launcher's* theme, not ours, and this copy also
+     picks up the Material You tint on API 31+. Replaces the old accent-filled bg_widget_play. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/widget_ripple">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/widget_control_container" />
+        </shape>
+    </item>
+</ripple>

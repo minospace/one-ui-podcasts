@@ -79,8 +79,9 @@ class OnecastWidgetProvider : AppWidgetProvider() {
         const val ACTION_SKIP_BACK = "be.miro.onecast.widget.ACTION_SKIP_BACK"
         private const val ACTION_TIMEOUT_MS = 5_000L
         private const val ART_SIZE_PX = 220
-        // ~20% of the art size, matching the 12dp corners of the 60dp placeholder behind it.
-        private const val ART_CORNER_RADIUS_PX = 44
+        // Width of the artwork slot in the layout; the bitmap is decoded larger than the slot, so
+        // the corner radius has to be scaled into bitmap space to match the placeholder behind it.
+        private const val ART_SLOT_DP = 56f
         // Inset applied to the artwork slot only in the empty state, so the Onecast mark doesn't
         // touch the rounded edges; real artwork fills the slot edge-to-edge (padding 0).
         private const val EMPTY_ART_PADDING_DP = 10
@@ -122,7 +123,7 @@ class OnecastWidgetProvider : AppWidgetProvider() {
                     Glide.with(context.applicationContext)
                         .asBitmap()
                         .load(artworkUrl)
-                        .transform(RoundedCorners(ART_CORNER_RADIUS_PX))
+                        .transform(RoundedCorners(artCornerRadiusPx(context)))
                         .submit(ART_SIZE_PX, ART_SIZE_PX)
                         .get()
                 }.getOrNull()
@@ -131,6 +132,13 @@ class OnecastWidgetProvider : AppWidgetProvider() {
                     for (id in ids) manager.updateAppWidget(id, buildViews(context, state, bitmap))
                 }
             }
+        }
+
+        /** [R.dimen.widget_art_radius] expressed in the decoded bitmap's pixel space. */
+        private fun artCornerRadiusPx(context: Context): Int {
+            val metrics = context.resources.displayMetrics
+            val radiusDp = context.resources.getDimension(R.dimen.widget_art_radius) / metrics.density
+            return (radiusDp * ART_SIZE_PX / ART_SLOT_DP).toInt()
         }
 
         private fun buildViews(context: Context, state: WidgetState?, artwork: Bitmap?): RemoteViews {
@@ -156,7 +164,7 @@ class OnecastWidgetProvider : AppWidgetProvider() {
             views.setViewVisibility(R.id.widget_skip_forward, View.VISIBLE)
             views.setImageViewResource(
                 R.id.widget_play_pause,
-                if (state.isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
+                if (state.isPlaying) R.drawable.ic_pause_rounded else R.drawable.ic_play_rounded,
             )
             if (state.durationMs > 0) {
                 views.setViewVisibility(R.id.widget_time_row, View.VISIBLE)
