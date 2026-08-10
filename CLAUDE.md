@@ -27,12 +27,18 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 - Android SDK lives at `/opt/homebrew/share/android-commandlinetools` (installed via
   `brew install --cask android-commandlinetools`); `local.properties` points `sdk.dir` there and
   is gitignored — regenerate it if missing: `echo "sdk.dir=/opt/homebrew/share/android-commandlinetools" > local.properties`.
-- **Bump the version only when the user asks to push** (any branch), never on an ordinary commit
-  and never as an unprompted step: `versionCode` (int, `app/build.gradle.kts`) always increments by
-  1. `versionName` is `MAJOR.MINOR.PATCH` — bump PATCH for a fix, MINOR for a new user-visible
-  feature, MAJOR for a breaking/rearchitecture change. Also update `VERSION.txt` (gitignored local
-  quick-reference, mirrors `versionCode`/`versionName`) to match — regenerate it if missing. Don't
-  push yourself — the user runs the push.
+- **Versioning happens only when the user asks to push** (any branch), never on an ordinary commit
+  and never as an unprompted step. The two fields move on different triggers:
+  - `versionCode` (int, `app/build.gradle.kts`) **always increments by 1 on a push**. It's the
+    system's upgrade counter, not a label: the package manager refuses to install over a higher
+    code, and Play rejects a repeat, so every pushed build needs its own — including betas and
+    re-cuts of the "same" release.
+  - `versionName` (`MAJOR.MINOR.PATCH`) **changes only when the user explicitly says to**, and to
+    the value they give. Don't infer a bump from the size of the change; a release can keep its
+    name across several `versionCode`s (e.g. successive betas of 2.9.0).
+  Mirror whatever you changed into `VERSION.txt` (gitignored local quick-reference of
+  `versionCode`/`versionName`) — regenerate it if missing. Don't push yourself unless asked — the
+  user normally runs the push.
 - **Always log user-visible changes in `releasenotes.txt`** (project root, gitignored): whenever a
   change adds or alters something a user would notice, append one short, user-facing bullet
   describing *what changed for them* (not the implementation). Do this automatically as part of
