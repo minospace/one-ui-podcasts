@@ -19,6 +19,24 @@
         <item name="android:navigationBarColor">@color/app_content_background</item>
     </style>
 
+    <!-- Opt-in Material 3 Expressive accent (Settings → "Material You colours"). Applied at runtime
+         with `Theme.applyStyle` by ui/ExpressiveTheme rather than declared in the manifest, so it
+         layers over whichever base theme an activity already has (AppTheme or PlayerTheme) without
+         needing an Expressive twin of each. Parent is empty on purpose: an overlay must contribute
+         only the handful of attributes below, not a whole theme's worth of defaults.
+
+         Accent attributes only. colorPrimaryDark is deliberately left alone — OneUITheme paints the
+         status bar from the window background, and tinting it here would put a wallpaper-coloured
+         band above the content and break the flat single-surface rule. -->
+    <style name="ThemeOverlay.Onecast.Expressive" parent="">
+        <item name="colorPrimary">@color/app_primary_expressive</item>
+        <!-- appcompat/SESL tint their controls (switches, checkboxes, sliders, text-selection
+             handles) from colorAccent, not colorPrimary, so both have to move together or the
+             Settings switches would stay blue on an otherwise recoloured screen. -->
+        <item name="colorAccent">@color/app_primary_expressive</item>
+        <item name="android:colorAccent">@color/app_primary_expressive</item>
+    </style>
+
     <!-- Full player: translucent so the screen behind shows through while the user drags the
          sheet down to dismiss it. The player's own root paints an opaque surface, so the
          translucency is only visible in the gap the sheet vacates during a drag. -->

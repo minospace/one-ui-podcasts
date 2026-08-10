@@ -1,4 +1,9 @@
 <resources>
+    <!-- M3 baseline primary at tone 80 — the dark-scheme counterpart of the tone-40 light value in
+         values/colors.xml, so the opt-in accent stays legible on the dark surface. Pre-Android-12
+         fallback; API 31+ uses the system palette (values-night-v31). -->
+    <color name="app_primary_expressive">#FFD0BCFF</color>
+
     <!-- Slightly-elevated surface above the near-black One UI dark background. -->
     <color name="app_mini_player_surface">#FF252528</color>
     <color name="app_divider">#33AAAAAA</color>

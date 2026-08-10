@@ -10,6 +10,11 @@
      on-secondary-container rather than a filled primary, because the full-screen player renders all
      three as one neutral round family (bg_round_gray) and the widget follows it. -->
 <resources>
+    <!-- The app's opt-in Material You accent (Settings → "Material You colours"): M3 `primary` in
+         the light scheme, i.e. the wallpaper-derived accent1 at tone 40. Unlike the widget_* names
+         below this one only takes effect when the user turns the setting on. -->
+    <color name="app_primary_expressive">@android:color/system_accent1_600</color>
+
     <!-- surfaceContainer-ish: a faintly wallpaper-tinted card, not flat white. -->
     <color name="widget_surface">@android:color/system_accent2_50</color>
     <color name="widget_surface_stroke">@android:color/system_accent2_100</color>

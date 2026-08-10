@@ -15,7 +15,7 @@
         android:layout_marginEnd="12dp"
         android:contentDescription="Current chapter"
         android:src="@drawable/ic_equalizer"
-        android:tint="@color/app_primary"
+        android:tint="?attr/colorPrimary"
         android:visibility="invisible" />
 
     <TextView

@@ -106,6 +106,20 @@ app/src/main/java/be/miro/onecast/
   views black and recolouring `RoundFrameLayout`/`RoundLinearLayout` corners. Activities call
   `recreate()` from `onResume` when the active state changed (so back-stack screens re-theme after
   the toggle). Only applies while the system is in dark mode; leave light mode alone.
+- **Material 3 Expressive accent** (Settings → "Material You colours", off by default): swaps the
+  One UI blue accent for the wallpaper-derived M3 palette (`@android:color/system_accent1_*` on API
+  31+, M3 baseline below). *Accent only* — surfaces stay One UI's flat neutral, so it composes with
+  AMOLED mode and doesn't reintroduce a grey panel. Unlike `AmoledTheme` this needs no view walking:
+  the accent is reachable via `?attr/colorPrimary`, so `ui/ExpressiveTheme.apply()` layers the
+  `ThemeOverlay.Onecast.Expressive` overlay onto the activity theme — **call it in `onCreate` before
+  `setContentView`**, since the overlay only reaches views inflated after it. `MediaActivity` does
+  this for its five subclasses; `SearchActivity`/`SettingsActivity` do it themselves. Back-stack
+  screens `recreate()` from `onResume` on change, same as AMOLED.
+  **Nothing should reference `@color/app_primary` directly** — use `?attr/colorPrimary` (or
+  `ExpressiveTheme.accent()` from code), or that element stays blue while the rest of the app moves.
+  The home-screen widget is the deliberate exception: it's always Material You on API 31+ and
+  ignores this toggle, because a launcher-hosted widget can't read the app's theme or settings at
+  inflate time.
 
 ## Playback gotchas
 
@@ -152,7 +166,8 @@ emulator @podcast_test -no-window -no-audio -no-snapshot -no-boot-anim \
 **Implemented**: add podcast (iTunes search + RSS URL), subscriptions grid, podcast detail with
 swipe-refresh, streaming playback (background service, lock-screen controls, skip ±, speed),
 mini-player + full player with a shared-element artwork transition, mark played (manual/bulk/auto),
-resume positions, home-screen widget, light/dark following the system, episode downloads/offline
+resume positions, home-screen widget, light/dark following the system, optional Material You accent
+and pure-black dark mode, episode downloads/offline
 playback.
 
 **Downloads**: strictly user-initiated — there is no auto-download and none should be added.

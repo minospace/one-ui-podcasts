@@ -2,6 +2,15 @@
     <!-- One UI signature accent blue -->
     <color name="app_primary">#FF0381FE</color>
     <color name="app_on_primary">#FFFFFFFF</color>
+    <!-- Material 3 Expressive accent, used in place of app_primary when the user turns on
+         "Material You colours" in Settings (see ui/ExpressiveTheme). Everything accent-coloured
+         reaches this through ?attr/colorPrimary, which the overlay re-points here; nothing should
+         reference app_primary directly, or it would stay blue while the rest of the app moved.
+
+         This default is the M3 baseline primary (tone 40), the fallback for Android 11 and older
+         where there is no wallpaper-derived palette. On API 31+ the values-v31/ + values-night-v31/
+         variants re-point it at the system tonal palette, the same source the widget already uses. -->
+    <color name="app_primary_expressive">#FF6750A4</color>
     <color name="app_divider">#33808080</color>
     <color name="app_art_placeholder">#22808080</color>
     <!-- Semantic alias for the One UI content-panel background (oui_background_color), so app
@@ -40,10 +49,12 @@
 
          These (values/ + values-night/) are the pre-Android-12 fallback. On API 31+ the same names
          are re-pointed at the wallpaper-derived Material You tonal palettes in values-v31/ +
-         values-night-v31/, so the widget tints itself like Google's own widgets do. The *app*
-         deliberately stays One UI blue — only the widget goes dynamic, which is why it has its own
-         colour names and its own copies of the shared drawables (bg_widget_art, widget_progress,
-         bg_widget_control) rather than sharing bg_art_placeholder / mini_progress / bg_round_gray. -->
+         values-night-v31/, so the widget tints itself like Google's own widgets do. The widget goes
+         dynamic unconditionally (a launcher-hosted widget can't read the app's theme or settings at
+         inflate time), while the *app* is One UI blue unless the user opts in to Material You
+         colours in Settings — which is why the widget has its own colour names and its own copies of
+         the shared drawables (bg_widget_art, widget_progress, bg_widget_control) rather than sharing
+         bg_art_placeholder / mini_progress / bg_round_gray. -->
     <color name="widget_surface">#FFFFFFFF</color>
     <color name="widget_surface_stroke">#33808080</color>
     <color name="widget_text_primary">#FF1A1A1A</color>

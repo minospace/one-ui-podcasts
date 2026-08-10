@@ -48,5 +48,5 @@
         android:layout_height="24dp"
         android:contentDescription="@null"
         android:src="@drawable/ic_add"
-        android:tint="@color/app_primary" />
+        android:tint="?attr/colorPrimary" />
 </LinearLayout>

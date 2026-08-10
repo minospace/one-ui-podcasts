@@ -6,11 +6,14 @@
             <solid android:color="@color/app_divider" />
         </shape>
     </item>
+    <!-- Accent via the theme attribute, not @color/app_primary, so the fill follows the optional
+         Material You accent (ui/ExpressiveTheme). Resolved against the inflating activity's theme,
+         which is where the overlay is layered on. -->
     <item android:id="@android:id/progress">
         <clip>
             <shape android:shape="rectangle">
                 <corners android:radius="2dp" />
-                <solid android:color="@color/app_primary" />
+                <solid android:color="?attr/colorPrimary" />
             </shape>
         </clip>
     </item>

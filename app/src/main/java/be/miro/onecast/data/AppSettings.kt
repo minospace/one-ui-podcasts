@@ -56,6 +56,14 @@ class AppSettings(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean(KEY_AMOLED_SHOW_CARDS, false)
 
     /**
+     * Draw the accent in the Material 3 Expressive palette instead of the One UI signature blue.
+     * On Android 12+ that palette is derived from the wallpaper; below it falls back to the M3
+     * baseline. Surfaces stay One UI's flat neutral either way — only the accent moves.
+     */
+    val expressiveColor: Boolean
+        get() = prefs.getBoolean(KEY_EXPRESSIVE_COLOR, false)
+
+    /**
      * The playback speeds the player cycles through, sorted ascending. The user picks which ones
      * to include in Settings; an empty selection falls back to normal speed so the chip never dies.
      */
@@ -87,6 +95,7 @@ class AppSettings(private val prefs: SharedPreferences) {
         const val KEY_FORWARD_SECONDS = "forward_seconds"
         const val KEY_AMOLED_BLACK = "amoled_black"
         const val KEY_AMOLED_SHOW_CARDS = "amoled_show_cards"
+        const val KEY_EXPRESSIVE_COLOR = "expressive_color"
         const val KEY_PLAYBACK_SPEEDS = "playback_speeds"
 
         const val DEFAULT_REWIND_SECONDS = 15

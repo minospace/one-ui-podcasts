@@ -24,9 +24,14 @@ abstract class MediaActivity : AppCompatActivity() {
     protected val downloads: EpisodeDownloader get() = episodeDownloads
 
     private var amoledApplied = false
+    private var expressiveApplied = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Before any subclass calls setContentView: the accent overlay only reaches views that are
+        // inflated after it's layered onto the theme.
+        ExpressiveTheme.apply(this)
+        expressiveApplied = ExpressiveTheme.isActive(this)
         playerConnection = PlayerConnection(this, lifecycle)
         // Capture the current AMOLED state as the baseline for the onResume check below, so it
         // fires only when the setting actually changes while we're in the back stack. Subclasses
@@ -44,8 +49,12 @@ abstract class MediaActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // The AMOLED setting may have been toggled (e.g. on the Settings screen) while this
-        // activity sat in the back stack; rebuild so the new background takes effect.
-        if (AmoledTheme.isActive(this) != amoledApplied) recreate()
+        // Either theming setting may have been toggled (e.g. on the Settings screen) while this
+        // activity sat in the back stack; rebuild so the new background/accent takes effect.
+        if (AmoledTheme.isActive(this) != amoledApplied ||
+            ExpressiveTheme.isActive(this) != expressiveApplied
+        ) {
+            recreate()
+        }
     }
 }
