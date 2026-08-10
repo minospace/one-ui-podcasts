@@ -52,20 +52,24 @@ class PlaybackService : MediaSessionService() {
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(30_000)
             .setReadTimeoutMs(30_000)
+        // Wrapped so the tracking-redirect chain is walked once per URL rather than on every open
+        // (see RedirectCachingDataSource) — that chain is most of the wait before the first sound.
         val mediaSourceFactory = DefaultMediaSourceFactory(
-            DefaultDataSource.Factory(this, httpDataSourceFactory),
+            RedirectCachingDataSource.Factory(
+                DefaultDataSource.Factory(this, httpDataSourceFactory),
+            ),
         )
 
         // Start playback as soon as a small amount of audio is buffered instead of the Media3
-        // default 2.5s. Podcasts are low-bitrate speech, and their URLs redirect through several
-        // tracking/CDN hops before the first byte arrives, so the default threshold makes the very
-        // first play feel sluggish. Keep the (generous) steady-state buffer so playback stays
-        // smooth once it's going; only the initial/after-rebuffer start thresholds are lowered.
+        // default 2.5s. Podcasts are low-bitrate speech, so half a second of audio is a few KB —
+        // it arrives in the first packets after the connection is up, and waiting for more just
+        // adds dead time to every start. Keep the (generous) steady-state buffer so playback stays
+        // smooth once it's going, and refill more before resuming from an actual stall.
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
                 DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
-                /* bufferForPlaybackMs = */ 1_000,
+                /* bufferForPlaybackMs = */ 500,
                 /* bufferForPlaybackAfterRebufferMs = */ 2_000,
             )
             .setPrioritizeTimeOverSizeThresholds(true)

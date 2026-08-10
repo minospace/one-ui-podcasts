@@ -33,6 +33,13 @@ class PlayerConnection(
     /** Called on player state changes and ~2x/second while connected. */
     var onUpdate: (() -> Unit)? = null
 
+    /**
+     * A tap that arrives before the service has finished binding — most likely on the very first
+     * play after a cold start, which is exactly when the connection is slowest. Held here and run
+     * on connect instead of being dropped, so the episode doesn't need a second tap.
+     */
+    private var pendingAction: ((MediaController) -> Unit)? = null
+
     private val handler = Handler(Looper.getMainLooper())
     private val ticker = object : Runnable {
         override fun run() {
@@ -59,7 +66,9 @@ class PlayerConnection(
             {
                 controller = runCatching { f.get() }.getOrNull()?.also {
                     it.addListener(playerListener)
+                    pendingAction?.invoke(it)
                 }
+                pendingAction = null
                 onUpdate?.invoke()
                 handler.post(ticker)
             },
@@ -69,6 +78,7 @@ class PlayerConnection(
 
     override fun onStop(owner: LifecycleOwner) {
         handler.removeCallbacks(ticker)
+        pendingAction = null
         controller?.removeListener(playerListener)
         controller?.release()
         controller = null
@@ -76,8 +86,7 @@ class PlayerConnection(
         future = null
     }
 
-    fun loadEpisode(item: MediaItem, startPositionMs: Long) {
-        val c = controller ?: return
+    fun loadEpisode(item: MediaItem, startPositionMs: Long) = withController { c ->
         c.setMediaItem(item, startPositionMs.coerceAtLeast(0))
         c.prepare()
     }
@@ -86,9 +95,14 @@ class PlayerConnection(
     fun isCurrent(episodeId: Long): Boolean =
         controller?.currentMediaItem?.mediaId == episodeId.toString()
 
-    fun togglePlayPause() {
-        val c = controller ?: return
+    fun togglePlayPause() = withController { c ->
         if (c.isPlaying) c.pause() else c.play()
+    }
+
+    /** Runs [action] now, or as soon as the controller connects (see [pendingAction]). */
+    private fun withController(action: (MediaController) -> Unit) {
+        val c = controller
+        if (c != null) action(c) else pendingAction = action
     }
 
     // Seek by the user's current skip amounts directly (rather than the player's built-in

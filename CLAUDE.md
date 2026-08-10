@@ -128,6 +128,11 @@ app/src/main/java/be/miro/onecast/
   `DefaultHttpDataSource` must have `setAllowCrossProtocolRedirects(true)` (wired in
   `PlaybackService.onCreate`) or playback fails with a generic "Source error". Manifest also
   needs `android:usesCleartextTraffic="true"`.
+- That same redirect chain is the bulk of the wait before the first sound, and ExoPlayer opens a
+  URL several times per episode (header read, then again from a byte offset on every seek/resume,
+  and after a network hiccup). `RedirectCachingDataSource` wraps the data source and remembers
+  where each URL landed, so only the first open pays the chain; entries are process-scoped and a
+  failed shortcut falls back to the original URL, because CDN links are often signed and expire.
 - A `BroadcastReceiver`'s `Context` (including `AppWidgetProvider.onReceive`, even after
   `goAsync()`) is **bind-restricted** — `MediaController.Builder(context, token).buildAsync()`
   throws `ReceiverCallNotAllowedException` if given the receiver's own context. Always pass
