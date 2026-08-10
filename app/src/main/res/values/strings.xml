@@ -18,6 +18,7 @@
     <string name="queue_add">Add to Up Next</string>
     <string name="queue_remove">Remove from Up Next</string>
     <string name="queue_clear">Clear Up Next</string>
+    <string name="queue_clear_short">Clear</string>
     <string name="queue_clear_message">Remove all episodes from Up Next?</string>
     <string name="queue_remove_item">Remove</string>
     <string name="queue_added">Added to Up Next</string>
@@ -68,6 +69,8 @@
     <string name="settings_autoqueue_title">Queue newer episodes</string>
     <string name="settings_autoqueue_summary">When you start an episode, automatically add that podcast\'s newer unplayed episodes to Up Next, oldest first.</string>
     <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_expressive_title">Material You colours</string>
+    <string name="settings_expressive_summary">Tint the accent with the Material 3 Expressive palette taken from your wallpaper, instead of the One UI blue. Backgrounds stay unchanged.</string>
     <string name="settings_amoled_title">Pure black dark mode</string>
     <string name="settings_amoled_summary">Use a true-black background in dark mode. Saves power and looks best on AMOLED screens; no effect in light mode.</string>
     <string name="settings_amoled_cards_title">Show grouped cards</string>

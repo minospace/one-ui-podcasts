@@ -14,7 +14,9 @@ import dev.oneuiproject.oneui.layout.ToolbarLayout
 /** Base activity that owns a lifecycle-bound [PlayerConnection] and exposes the repository. */
 abstract class MediaActivity : AppCompatActivity() {
 
-    protected lateinit var playerConnection: PlayerConnection
+    // Internal rather than protected: sheets hosted by these activities (e.g. QueueSheet) drive the
+    // same controller.
+    internal lateinit var playerConnection: PlayerConnection
         private set
 
     protected val repository: PodcastRepository get() = podcastRepository

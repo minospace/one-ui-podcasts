@@ -41,10 +41,6 @@
             android:exported="false" />
 
         <activity
-            android:name=".ui.queue.QueueActivity"
-            android:exported="false" />
-
-        <activity
             android:name=".ui.downloads.DownloadsActivity"
             android:exported="false" />
 

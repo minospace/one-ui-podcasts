@@ -33,7 +33,7 @@ import be.miro.onecast.databinding.ActivityPlayerBinding
 import be.miro.onecast.playback.MediaItems
 import be.miro.onecast.ui.Format
 import be.miro.onecast.ui.MediaActivity
-import be.miro.onecast.ui.queue.QueueActivity
+import be.miro.onecast.ui.queue.QueueSheet
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.GlideException
@@ -69,7 +69,7 @@ class PlayerActivity : MediaActivity() {
         postponeEnterTransition()
         binding.root.postDelayed({ beginEnterTransition() }, 300)
 
-        binding.playerUpNext.setOnClickListener { QueueActivity.start(this) }
+        binding.playerUpNext.setOnClickListener { QueueSheet.show(this) }
         setupDragToDismiss()
         binding.playerPlayPause.setOnClickListener { playerConnection.togglePlayPause() }
         binding.playerSkipBack.setOnClickListener { playerConnection.seekBack() }

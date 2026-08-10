@@ -37,6 +37,20 @@
         <item name="android:colorAccent">@color/app_primary_expressive</item>
     </style>
 
+    <!-- Bottom sheets (Up Next). Only the dialog window comes from here: the sheet's *content* is
+         inflated with the host activity's context (see QueueSheet), so the One UI day/night colours
+         and the optional Expressive accent still resolve. The modal's own background is cleared so
+         the rounded @drawable/bg_bottom_sheet surface shows through. -->
+    <style name="Onecast.BottomSheetDialog" parent="Theme.Design.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Onecast.BottomSheet</item>
+        <item name="android:navigationBarColor">@color/app_content_background</item>
+    </style>
+
+    <style name="Onecast.BottomSheet" parent="Widget.Design.BottomSheet.Modal">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="behavior_peekHeight">auto</item>
+    </style>
+
     <!-- Full player: translucent so the screen behind shows through while the user drags the
          sheet down to dismiss it. The player's own root paints an opaque surface, so the
          translucency is only visible in the gap the sheet vacates during a drag. -->

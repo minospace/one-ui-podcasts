@@ -23,7 +23,7 @@ import be.miro.onecast.playback.MediaItems
 import be.miro.onecast.ui.MediaActivity
 import be.miro.onecast.ui.downloads.DownloadsActivity
 import be.miro.onecast.ui.player.PlayerActivity
-import be.miro.onecast.ui.queue.QueueActivity
+import be.miro.onecast.ui.queue.QueueSheet
 import kotlinx.coroutines.launch
 
 class PodcastActivity : MediaActivity() {
@@ -221,7 +221,7 @@ class PodcastActivity : MediaActivity() {
             true
         }
         R.id.action_queue -> {
-            QueueActivity.start(this)
+            QueueSheet.show(this)
             true
         }
         R.id.action_downloads -> {

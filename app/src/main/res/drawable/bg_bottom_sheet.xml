@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One UI-style sheet surface: the flat content colour with rounded top corners only. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/app_content_background" />
+    <corners
+        android:topLeftRadius="26dp"
+        android:topRightRadius="26dp" />
+</shape>

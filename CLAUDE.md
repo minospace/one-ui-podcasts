@@ -120,6 +120,14 @@ app/src/main/java/be/miro/onecast/
   The home-screen widget is the deliberate exception: it's always Material You on API 31+ and
   ignores this toggle, because a launcher-hosted widget can't read the app's theme or settings at
   inflate time.
+- **Bottom sheets** (`ui/queue/QueueSheet`, the Up Next queue): the SESL Material fork ships
+  `BottomSheetDialogFragment`, so use it — there's no One UI sheet in oneui-design. Two things to
+  copy: the fragment's own theme (`Onecast.BottomSheetDialog`) only strips the modal's background so
+  `@drawable/bg_bottom_sheet` shows through, and the content is inflated with
+  `inflater.cloneInContext(requireActivity())` — a dialog theme is applied *on top of* the
+  activity's, so inflating with the dialog's context would override the One UI day/night colours and
+  the Expressive accent overlay with Material's defaults. AMOLED is handled by tinting the sheet
+  background black in `onViewCreated` (no view walking needed — the sheet paints its own surface).
 
 ## Playback gotchas
 
