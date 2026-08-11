@@ -8,16 +8,6 @@
     android:paddingHorizontal="24dp"
     android:paddingVertical="14dp">
 
-    <ImageView
-        android:id="@+id/chapter_now_playing"
-        android:layout_width="18dp"
-        android:layout_height="18dp"
-        android:layout_marginEnd="12dp"
-        android:contentDescription="Current chapter"
-        android:src="@drawable/ic_equalizer"
-        android:tint="?attr/colorPrimary"
-        android:visibility="invisible" />
-
     <TextView
         android:id="@+id/chapter_title"
         android:layout_width="0dp"

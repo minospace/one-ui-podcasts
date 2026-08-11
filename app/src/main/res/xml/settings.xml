@@ -36,6 +36,16 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory app:title="@string/settings_section_video">
+
+        <SwitchPreferenceCompat
+            app:key="preload_video"
+            app:title="@string/settings_preload_video_title"
+            app:summary="@string/settings_preload_video_summary"
+            app:defaultValue="true" />
+
+    </PreferenceCategory>
+
     <PreferenceCategory app:title="@string/settings_section_queue">
 
         <SwitchPreferenceCompat

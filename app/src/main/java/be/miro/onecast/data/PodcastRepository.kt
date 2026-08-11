@@ -89,21 +89,21 @@ class PodcastRepository(
     fun observeDownloads(): Flow<List<EpisodeWithPodcast>> = episodeDao.observeDownloaded()
     fun observeDownloadedEpisodeIds(): Flow<List<Long>> = episodeDao.observeDownloadedIds()
 
-    /** Records a completed download. */
-    suspend fun setDownloaded(episodeId: Long, path: String, sizeBytes: Long) =
-        episodeDao.setDownload(episodeId, path, sizeBytes, System.currentTimeMillis())
+    /** Records a completed download; [hasVideo] is true when the saved file carries the video track. */
+    suspend fun setDownloaded(episodeId: Long, path: String, sizeBytes: Long, hasVideo: Boolean) =
+        episodeDao.setDownload(episodeId, path, sizeBytes, System.currentTimeMillis(), hasVideo)
 
     /** Deletes an episode's downloaded audio; the episode itself (and its progress) stays. */
     suspend fun deleteDownload(episodeId: Long) {
         val episode = episodeDao.getById(episodeId) ?: return
         downloadStore.delete(episode.downloadPath)
-        episodeDao.setDownload(episodeId, null, 0, 0)
+        episodeDao.setDownload(episodeId, null, 0, 0, false)
     }
 
     suspend fun deleteAllDownloads() {
         for (episode in episodeDao.getDownloaded()) {
             downloadStore.delete(episode.downloadPath)
-            episodeDao.setDownload(episode.id, null, 0, 0)
+            episodeDao.setDownload(episode.id, null, 0, 0, false)
         }
     }
 
@@ -117,7 +117,7 @@ class PodcastRepository(
         downloadStore.deleteExcept(known + activePaths)
         for (episode in downloaded) {
             val path = episode.downloadPath ?: continue
-            if (!File(path).exists()) episodeDao.setDownload(episode.id, null, 0, 0)
+            if (!File(path).exists()) episodeDao.setDownload(episode.id, null, 0, 0, false)
         }
     }
 
@@ -210,7 +210,10 @@ class PodcastRepository(
                 guid = e.guid,
                 title = e.title,
                 description = e.description,
-                audioUrl = e.audioUrl,
+                // A video-only item has no audio enclosure to fall back on: play the video file
+                // (its audio track) rather than dropping the episode.
+                audioUrl = e.audioUrl ?: e.videoUrl.orEmpty(),
+                videoUrl = e.videoUrl,
                 pubDate = e.pubDate,
                 durationMs = e.durationMs,
                 imageUrl = e.imageUrl,
@@ -228,6 +231,9 @@ class PodcastRepository(
             }
             if (e.imageUrl != null) {
                 episodeDao.backfillImage(podcastId, e.guid, e.imageUrl)
+            }
+            if (e.videoUrl != null) {
+                episodeDao.backfillVideo(podcastId, e.guid, e.videoUrl)
             }
         }
     }

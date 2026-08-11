@@ -17,7 +17,6 @@ import be.miro.onecast.R
 import be.miro.onecast.data.EpisodeWithPodcast
 import be.miro.onecast.databinding.ActivityDownloadsBinding
 import be.miro.onecast.download.DownloadTask
-import be.miro.onecast.playback.MediaItems
 import be.miro.onecast.ui.Format
 import be.miro.onecast.ui.MediaActivity
 import be.miro.onecast.ui.player.PlayerActivity
@@ -44,7 +43,8 @@ class DownloadsActivity : MediaActivity() {
             onPlay = ::play,
             onDelete = ::confirmDelete,
             onCancel = { downloads.cancel(it.episodeId) },
-            onRetry = { downloads.enqueue(it.episodeId) },
+            // Retry what the user originally asked for, video choice included.
+            onRetry = { downloads.enqueue(it.episodeId, it.includeVideo) },
         )
         binding.downloadList.layoutManager = LinearLayoutManager(this)
         binding.downloadList.adapter = adapter
@@ -86,7 +86,7 @@ class DownloadsActivity : MediaActivity() {
             val episode = item.episode
             val podcast = repository.getPodcast(episode.podcastId)
             val startAt = if (episode.isPlayed) 0L else episode.positionMs
-            playerConnection.loadEpisode(MediaItems.fromEpisode(episode, podcast), startAt)
+            playerConnection.loadEpisode(episode, podcast, startAt)
             repository.onEpisodeStarted(episode.id, settings.autoQueueNewer)
         }
     }

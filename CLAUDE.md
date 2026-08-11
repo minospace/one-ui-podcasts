@@ -147,6 +147,21 @@ app/src/main/java/be/miro/onecast/
   and after a network hiccup). `RedirectCachingDataSource` wraps the data source and remembers
   where each URL landed, so only the first open pays the chain; entries are process-scoped and a
   failed shortcut falls back to the original URL, because CDN links are often signed and expire.
+- **Video episodes** (`playback/VideoMode`): a video podcast almost always ships *one* enclosure
+  (`type="video/mp4"`) carrying both tracks — a separate audio file only appears via Podcasting 2.0
+  `<podcast:alternateEnclosure>` or Media RSS. So switching between watching and listening is mostly
+  a **track-selection** change (`setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, …)`), and only swaps the
+  media item when the two sources are genuinely different files. Both URLs ride along in the media
+  item's metadata extras (`MediaItems`), so the player screen can switch without a database read.
+  Video is transient, never persisted: every episode starts as audio, and `PlaybackService` clears
+  the flag on a media-item transition *to a different episode id* (a source swap keeps the id).
+  Settings → "Preload video" keeps the video track enabled while listening so switching is instant;
+  turning it off means re-enabling the track mid-episode, which re-buffers. **A video renderer
+  failure must never cost the audio** — `VideoMode.recoverFromError` catches the renderer-level
+  `ExoPlaybackException`, disables video and re-prepares, because an ExoPlayer error otherwise stops
+  the whole episode (seen for real: a device with no free/capable H.264 decoder).
+  The player draws into a `TextureView`, not a `SurfaceView`: the player screen is a sheet the user
+  drags and fades, which a surface wouldn't follow.
 - A `BroadcastReceiver`'s `Context` (including `AppWidgetProvider.onReceive`, even after
   `goAsync()`) is **bind-restricted** — `MediaController.Builder(context, token).buildAsync()`
   throws `ReceiverCallNotAllowedException` if given the receiver's own context. Always pass
@@ -187,9 +202,12 @@ swipe-refresh, streaming playback (background service, lock-screen controls, ski
 mini-player + full player with a shared-element artwork transition, mark played (manual/bulk/auto),
 resume positions, home-screen widget, light/dark following the system, optional Material You accent
 and pure-black dark mode, episode downloads/offline
-playback.
+playback, video podcasts (audio first, with a toggle to watch).
 
-**Downloads**: strictly user-initiated — there is no auto-download and none should be added.
+**Downloads**: strictly user-initiated — there is no auto-download and none should be added. An
+episode with video asks before downloading: a choice of versions when audio and video are separate
+files, otherwise a confirmation that the (much larger) video file is what gets saved;
+`episodes.downloadHasVideo` records which one landed on disk.
 `EpisodeDownloader` runs one download at a time off an in-memory queue (progress is far too chatty
 to persist; only the finished file's path/size/timestamp land on the `episodes` row).
 `DownloadService` exists solely to hold the foreground-service notification that mirrors that queue

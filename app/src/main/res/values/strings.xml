@@ -9,6 +9,13 @@
     <string name="chapters">Chapters</string>
     <string name="close">Close</string>
 
+    <!-- Video -->
+    <string name="video_show">Video</string>
+    <string name="video_hide">Audio</string>
+    <string name="video_label">Video</string>
+    <string name="video_loading">Loading video…</string>
+    <string name="video_failed">Couldn\'t play the video — keeping the audio going</string>
+
     <!-- Up Next queue -->
     <string name="queue_title">Up Next</string>
     <string name="action_queue">Up Next</string>
@@ -31,6 +38,10 @@
     <string name="downloads_empty">Nothing downloaded</string>
     <string name="downloads_empty_hint">Long-press an episode and choose Download to keep it on your phone. Episodes are only ever downloaded when you ask.</string>
     <string name="downloads_download">Download</string>
+    <string name="download_video_choice_message">This episode has video. The video file is a lot bigger — audio only is enough for listening.</string>
+    <string name="download_video_choice_video">Video and audio</string>
+    <string name="download_video_choice_audio">Audio only</string>
+    <string name="download_video_only_message">This episode is published as a video, so downloading it saves the video file — much bigger than an audio episode. Download it anyway?</string>
     <string name="downloads_delete">Delete download</string>
     <string name="downloads_delete_message">Delete the downloaded file for \"%1$s\"? The episode stays in the list and can be streamed or downloaded again.</string>
     <string name="downloads_delete_all">Delete all downloads</string>
@@ -65,6 +76,9 @@
     <string name="settings_section_speed">Playback speed</string>
     <string name="settings_speeds_title">Available speeds</string>
     <string name="settings_speeds_empty">None selected</string>
+    <string name="settings_section_video">Video</string>
+    <string name="settings_preload_video_title">Preload video</string>
+    <string name="settings_preload_video_summary">Keep a video episode\'s picture loaded while you\'re only listening, so switching to video is instant. Turn this off to load video only once you switch to it — switching then pauses to buffer first.</string>
     <string name="settings_section_queue">Up Next</string>
     <string name="settings_autoqueue_title">Queue newer episodes</string>
     <string name="settings_autoqueue_summary">When you start an episode, automatically add that podcast\'s newer unplayed episodes to Up Next, oldest first.</string>

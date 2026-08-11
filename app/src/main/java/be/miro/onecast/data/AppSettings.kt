@@ -41,6 +41,14 @@ class AppSettings(private val prefs: SharedPreferences) {
         get() = prefs.getString(KEY_FORWARD_SECONDS, null)?.toIntOrNull() ?: DEFAULT_FORWARD_SECONDS
 
     /**
+     * Keep a video episode's video loaded while the user is only listening, so switching to video
+     * is instant. Off, video is only loaded once the user asks for it — which saves the work of
+     * carrying video nobody is watching, at the cost of a pause to buffer when they switch.
+     */
+    val preloadVideo: Boolean
+        get() = prefs.getBoolean(KEY_PRELOAD_VIDEO, true)
+
+    /**
      * Use a true-black background in dark mode (saves power on AMOLED screens). Only takes effect
      * while the system is in dark mode; the day theme is unaffected.
      */
@@ -91,6 +99,7 @@ class AppSettings(private val prefs: SharedPreferences) {
         private const val KEY_HIDE_PLAYED = "hide_played_episodes"
         private const val KEY_AUTO_QUEUE_NEWER = "auto_queue_newer"
         private const val KEY_LAST_EPISODE = "last_episode_id"
+        const val KEY_PRELOAD_VIDEO = "preload_video"
         const val KEY_REWIND_SECONDS = "rewind_seconds"
         const val KEY_FORWARD_SECONDS = "forward_seconds"
         const val KEY_AMOLED_BLACK = "amoled_black"

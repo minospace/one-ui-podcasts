@@ -125,9 +125,8 @@ class PodcastActivity : MediaActivity() {
     }
 
     private fun play(episode: Episode) {
-        val item = MediaItems.fromEpisode(episode, podcast)
         val startAt = if (episode.isPlayed) 0L else episode.positionMs
-        playerConnection.loadEpisode(item, startAt)
+        playerConnection.loadEpisode(episode, podcast, startAt)
         // Starting an episode makes it "current", so drop it from the queue and (if enabled) line up
         // this podcast's newer unplayed episodes behind it.
         lifecycleScope.launch { repository.onEpisodeStarted(episode.id, settings.autoQueueNewer) }
@@ -159,8 +158,7 @@ class PodcastActivity : MediaActivity() {
                 MENU_ADD -> queueAction(episode, R.string.queue_added) { repository.addToQueue(it) }
                 MENU_REMOVE -> queueAction(episode, R.string.queue_removed) { repository.removeFromQueue(it) }
                 MENU_DOWNLOAD -> {
-                    downloads.enqueue(episode.id)
-                    toast(getString(R.string.downloads_started))
+                    startDownload(episode)
                     true
                 }
                 MENU_CANCEL_DOWNLOAD -> {
@@ -175,6 +173,45 @@ class PodcastActivity : MediaActivity() {
             }
         }
         popup.show()
+    }
+
+    /**
+     * Download an episode, letting the user decide what to do about video first.
+     *
+     * When the feed publishes video as its own file alongside the audio, that's a straight choice
+     * between the two. When the episode *is* a video file (the usual case — one enclosure carrying
+     * both tracks) there's no audio-only version to fetch, so the choice is only whether to accept
+     * a video-sized download at all.
+     */
+    private fun startDownload(episode: Episode) {
+        val builder = AlertDialog.Builder(this).setTitle(R.string.downloads_download)
+        when {
+            // Buttons rather than a list: a dialog shows either its message or a list of items,
+            // never both, and the size warning is the whole point of asking.
+            episode.hasSeparateVideoFile -> builder
+                .setMessage(R.string.download_video_choice_message)
+                .setPositiveButton(R.string.download_video_choice_video) { _, _ ->
+                    enqueueDownload(episode, includeVideo = true)
+                }
+                .setNegativeButton(R.string.download_video_choice_audio) { _, _ ->
+                    enqueueDownload(episode, includeVideo = false)
+                }
+                .setNeutralButton(android.R.string.cancel, null)
+                .show()
+            episode.hasVideo -> builder
+                .setMessage(R.string.download_video_only_message)
+                .setPositiveButton(R.string.download_video_choice_video) { _, _ ->
+                    enqueueDownload(episode, includeVideo = true)
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            else -> enqueueDownload(episode, includeVideo = false)
+        }
+    }
+
+    private fun enqueueDownload(episode: Episode, includeVideo: Boolean) {
+        downloads.enqueue(episode.id, includeVideo)
+        toast(getString(R.string.downloads_started))
     }
 
     private fun queueAction(

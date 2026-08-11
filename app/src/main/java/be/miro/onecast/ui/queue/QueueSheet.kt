@@ -15,7 +15,6 @@ import be.miro.onecast.R
 import be.miro.onecast.appSettings
 import be.miro.onecast.data.Episode
 import be.miro.onecast.databinding.SheetQueueBinding
-import be.miro.onecast.playback.MediaItems
 import be.miro.onecast.podcastRepository
 import be.miro.onecast.ui.AmoledTheme
 import be.miro.onecast.ui.MediaActivity
@@ -84,7 +83,7 @@ class QueueSheet : BottomSheetDialogFragment() {
             val repository = activity.podcastRepository
             val podcast = repository.getPodcast(episode.podcastId)
             val startAt = if (episode.isPlayed) 0L else episode.positionMs
-            activity.playerConnection.loadEpisode(MediaItems.fromEpisode(episode, podcast), startAt)
+            activity.playerConnection.loadEpisode(episode, podcast, startAt)
             repository.onEpisodeStarted(episode.id, activity.appSettings.autoQueueNewer)
         }
         dismiss()

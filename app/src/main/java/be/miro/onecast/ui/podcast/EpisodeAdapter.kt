@@ -191,6 +191,7 @@ class EpisodeAdapter(
                 episode.id in downloadingIds -> parts += "Downloading…"
                 episode.downloadPath != null -> parts += "Downloaded"
             }
+            if (episode.hasVideo) parts += title.context.getString(R.string.video_label)
             return parts.joinToString("  ·  ")
         }
     }

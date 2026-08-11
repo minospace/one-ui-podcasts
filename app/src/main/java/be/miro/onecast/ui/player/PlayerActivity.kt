@@ -14,6 +14,8 @@ import android.transition.ChangeTransform
 import android.transition.Slide
 import android.transition.TransitionSet
 import android.view.Gravity
+import android.view.View
+import android.view.WindowManager
 import android.view.animation.PathInterpolator
 import android.widget.SeekBar
 import android.widget.Toast
@@ -23,6 +25,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.Player
 import androidx.palette.graphics.Palette
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -31,6 +34,7 @@ import be.miro.onecast.data.Chapter
 import be.miro.onecast.data.indexAt
 import be.miro.onecast.databinding.ActivityPlayerBinding
 import be.miro.onecast.playback.MediaItems
+import be.miro.onecast.playback.VideoMode
 import be.miro.onecast.ui.Format
 import be.miro.onecast.ui.MediaActivity
 import be.miro.onecast.ui.queue.QueueSheet
@@ -57,6 +61,12 @@ class PlayerActivity : MediaActivity() {
     private var currentChapterIndex = -1
     private var chapterAdapter: ChapterAdapter? = null
 
+    /** What the screen currently shows, which lags [VideoMode] until the next [render]. */
+    private var videoShowing = false
+    private var videoAttached = false
+
+    private val hideScrubThumb = Runnable { binding.playerSeekbar.thumb?.alpha = 0 }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityPlayerBinding.inflate(layoutInflater)
@@ -77,7 +87,9 @@ class PlayerActivity : MediaActivity() {
         binding.playerSpeed.setOnClickListener { cycleSpeed() }
         binding.playerMarkPlayed.setOnClickListener { markPlayed() }
         binding.playerChapter.setOnClickListener { showChapterPicker() }
+        binding.playerVideoToggle.setOnClickListener { toggleVideo() }
 
+        binding.playerSeekbar.thumb = binding.playerSeekbar.thumb?.mutate()
         binding.playerSeekbar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) binding.playerPosition.text = Format.clock(progress * 1000L)
@@ -85,15 +97,31 @@ class PlayerActivity : MediaActivity() {
 
             override fun onStartTrackingTouch(seekBar: SeekBar) {
                 userSeeking = true
+                showScrubThumb()
             }
 
             override fun onStopTrackingTouch(seekBar: SeekBar) {
                 userSeeking = false
                 playerConnection.seekTo(seekBar.progress * 1000L)
+                scheduleHideScrubThumb()
             }
         })
+        showScrubThumb()
+        scheduleHideScrubThumb()
 
         playerConnection.onUpdate = { render() }
+    }
+
+    /** Show the seekbar's scrub thumb and cancel any pending auto-hide. */
+    private fun showScrubThumb() {
+        binding.playerSeekbar.removeCallbacks(hideScrubThumb)
+        binding.playerSeekbar.thumb?.alpha = 255
+    }
+
+    /** Hide the scrub thumb 2 seconds from now, unless scrubbing resumes first. */
+    private fun scheduleHideScrubThumb() {
+        binding.playerSeekbar.removeCallbacks(hideScrubThumb)
+        binding.playerSeekbar.postDelayed(hideScrubThumb, 2000)
     }
 
     /**
@@ -278,6 +306,86 @@ class PlayerActivity : MediaActivity() {
         }
 
         updateChapters(MediaItems.episodeId(controller.currentMediaItem), controller.currentPosition)
+        updateVideo(controller)
+    }
+
+    // ── Video ──────────────────────────────────────────────────────────────
+
+    /** Switch between watching and listening. Video is never on when an episode starts. */
+    private fun toggleVideo() {
+        val controller = playerConnection.controller ?: return
+        if (!MediaItems.hasVideo(controller.currentMediaItem)) return
+        val show = !VideoMode.isShowing
+        playerConnection.setVideoShowing(show)
+        // Without preloading, the picture has to be fetched before it can appear — say so rather
+        // than leaving the user looking at a player that seems stuck.
+        if (show && !settings.preloadVideo) {
+            Toast.makeText(this, R.string.video_loading, Toast.LENGTH_SHORT).show()
+        }
+        render()
+    }
+
+    private fun updateVideo(controller: Player) {
+        // The player fell back to audio because the video wouldn't decode — say so, once.
+        if (VideoMode.consumeVideoFailure()) {
+            Toast.makeText(this, R.string.video_failed, Toast.LENGTH_LONG).show()
+        }
+        val hasVideo = MediaItems.hasVideo(controller.currentMediaItem)
+        binding.playerVideoToggle.visibility = if (hasVideo) View.VISIBLE else View.GONE
+        applyVideoUi(hasVideo && VideoMode.isShowing)
+        if (!videoShowing) return
+
+        val size = controller.videoSize
+        if (size.width > 0 && size.height > 0) {
+            binding.playerVideoFrame.aspectRatio =
+                size.width * size.pixelWidthHeightRatio / size.height
+        }
+        // Switching a stream to video re-buffers; the spinner keeps the black frame from reading
+        // as a failure while that happens.
+        binding.playerVideoProgress.visibility =
+            if (controller.playbackState == Player.STATE_BUFFERING) View.VISIBLE else View.GONE
+    }
+
+    /** Puts the picture where the artwork was (and hands the player the surface), or takes it away. */
+    private fun applyVideoUi(show: Boolean) {
+        if (show != videoShowing) {
+            videoShowing = show
+            binding.playerVideoFrame.visibility = if (show) View.VISIBLE else View.GONE
+            // GONE, not INVISIBLE: the artwork's 300dp would otherwise push the video off-centre.
+            binding.playerArt.visibility = if (show) View.GONE else View.VISIBLE
+            binding.playerVideoToggle.setText(if (show) R.string.video_hide else R.string.video_show)
+            binding.playerVideoToggle.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                if (show) R.drawable.ic_headphones else R.drawable.ic_video,
+                0,
+                0,
+                0,
+            )
+            if (show) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            } else {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                binding.playerVideoProgress.visibility = View.GONE
+            }
+        }
+        if (show && !videoAttached && playerConnection.controller != null) {
+            playerConnection.attachVideo(binding.playerVideo)
+            videoAttached = true
+        } else if (!show) {
+            detachVideo()
+        }
+    }
+
+    private fun detachVideo() {
+        if (!videoAttached) return
+        playerConnection.detachVideo(binding.playerVideo)
+        videoAttached = false
+    }
+
+    override fun onStop() {
+        // Hand the surface back before the connection releases the controller on STOP — the player
+        // outlives this screen and mustn't be left drawing into a window that's gone.
+        detachVideo()
+        super.onStop()
     }
 
     /**

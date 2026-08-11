@@ -118,6 +118,11 @@ class DownloadsAdapter(
             if (item.episode.downloadSizeBytes > 0) {
                 parts += Format.fileSize(item.episode.downloadSizeBytes)
             }
+            // Only for a downloaded *video* file — an audio-only download of a video episode can
+            // still be watched, but not offline.
+            if (item.episode.downloadHasVideo) {
+                parts += itemView.context.getString(R.string.video_label)
+            }
             return parts.joinToString("  ·  ")
         }
     }

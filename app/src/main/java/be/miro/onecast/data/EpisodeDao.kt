@@ -71,6 +71,10 @@ interface EpisodeDao {
     @Query("UPDATE episodes SET imageUrl = :imageUrl WHERE podcastId = :podcastId AND guid = :guid AND imageUrl IS NULL")
     suspend fun backfillImage(podcastId: Long, guid: String, imageUrl: String?)
 
+    /** Backfills the video URL onto a row that already existed before video support. */
+    @Query("UPDATE episodes SET videoUrl = :videoUrl WHERE podcastId = :podcastId AND guid = :guid AND videoUrl IS NULL")
+    suspend fun backfillVideo(podcastId: Long, guid: String, videoUrl: String?)
+
     // ── Downloads ──────────────────────────────────────────────────────────
 
     /** Downloaded episodes, newest download first, each carrying its podcast title + artwork. */
@@ -96,7 +100,7 @@ interface EpisodeDao {
     /** Records a finished download; passing nulls/zeroes clears it again. */
     @Query(
         "UPDATE episodes SET downloadPath = :path, downloadSizeBytes = :sizeBytes, " +
-            "downloadedAt = :downloadedAt WHERE id = :id",
+            "downloadedAt = :downloadedAt, downloadHasVideo = :hasVideo WHERE id = :id",
     )
-    suspend fun setDownload(id: Long, path: String?, sizeBytes: Long, downloadedAt: Long)
+    suspend fun setDownload(id: Long, path: String?, sizeBytes: Long, downloadedAt: Long, hasVideo: Boolean)
 }

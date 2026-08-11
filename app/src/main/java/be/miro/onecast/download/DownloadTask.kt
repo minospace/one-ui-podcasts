@@ -10,6 +10,8 @@ enum class DownloadState { QUEUED, RUNNING, FAILED }
 data class DownloadTask(
     val episodeId: Long,
     val state: DownloadState,
+    /** The user asked for the video version — only ever true for an episode that has one. */
+    val includeVideo: Boolean = false,
     val title: String = "",
     val podcastTitle: String = "",
     val artworkUrl: String? = null,

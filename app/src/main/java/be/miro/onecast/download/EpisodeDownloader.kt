@@ -2,7 +2,6 @@ package be.miro.onecast.download
 
 import android.content.Context
 import android.os.SystemClock
-import be.miro.onecast.data.Episode
 import be.miro.onecast.data.PodcastRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -66,13 +65,17 @@ class EpisodeDownloader(
         .callTimeout(0, TimeUnit.MILLISECONDS)
         .build()
 
-    /** Queue an episode for download (no-op if it's already queued or downloading). */
-    fun enqueue(episodeId: Long) {
+    /**
+     * Queue an episode for download (no-op if it's already queued or downloading). [includeVideo]
+     * asks for the video version of an episode that publishes video separately from its audio; a
+     * plain video enclosure is one file with both tracks, so there's nothing to choose there.
+     */
+    fun enqueue(episodeId: Long, includeVideo: Boolean = false) {
         synchronized(lock) {
             if (_tasks.value.any { it.episodeId == episodeId && it.state != DownloadState.FAILED }) return
             // A previous failed attempt for the same episode is replaced by this fresh one.
             _tasks.value = _tasks.value.filterNot { it.episodeId == episodeId } +
-                DownloadTask(episodeId, DownloadState.QUEUED)
+                DownloadTask(episodeId, DownloadState.QUEUED, includeVideo = includeVideo)
         }
         DownloadNotifications.clearFailure(appContext, episodeId)
         DownloadService.start(appContext)
@@ -131,11 +134,12 @@ class EpisodeDownloader(
                 if (task == null) worker = null
                 task
             } ?: return
-            runDownload(next.episodeId)
+            runDownload(next)
         }
     }
 
-    private suspend fun runDownload(episodeId: Long) {
+    private suspend fun runDownload(task: DownloadTask) {
+        val episodeId = task.episodeId
         val episode = repository.getEpisode(episodeId)
         if (episode == null) {
             removeTask(episodeId)
@@ -149,15 +153,19 @@ class EpisodeDownloader(
         updateTask(episodeId) { it.copy(state = DownloadState.RUNNING, downloadedBytes = 0, error = null) }
         loadMetadata(episodeId)
 
+        // The video file is a different URL only when the feed publishes video separately; when the
+        // episode's one enclosure is video, the file downloaded here carries the picture regardless.
+        val url = if (task.includeVideo) episode.videoUrl ?: episode.audioUrl else episode.audioUrl
+        val hasVideo = episode.videoUrl != null && episode.videoUrl == url
         val partFile = store.partFileFor(episodeId)
-        val targetFile = store.fileFor(episodeId, episode.audioUrl)
+        val targetFile = store.fileFor(episodeId, url)
         val current = ActiveDownload(episodeId)
         active = current
         val watchdog = scope.launch { watchForStall(current) }
         try {
-            val bytes = withContext(Dispatchers.IO) { writeToFile(episode, partFile, current) }
+            val bytes = withContext(Dispatchers.IO) { writeToFile(episodeId, url, partFile, current) }
             if (!partFile.renameTo(targetFile)) throw IOException("Couldn't save the downloaded file")
-            repository.setDownloaded(episodeId, targetFile.absolutePath, bytes)
+            repository.setDownloaded(episodeId, targetFile.absolutePath, bytes, hasVideo)
             removeTask(episodeId)
         } catch (e: CancellationException) {
             partFile.delete()
@@ -178,9 +186,9 @@ class EpisodeDownloader(
     }
 
     /** Streams the response into [partFile], publishing progress as it goes. Returns bytes written. */
-    private fun writeToFile(episode: Episode, partFile: File, current: ActiveDownload): Long {
+    private fun writeToFile(episodeId: Long, url: String, partFile: File, current: ActiveDownload): Long {
         val request = Request.Builder()
-            .url(episode.audioUrl)
+            .url(url)
             .header("User-Agent", USER_AGENT)
             .build()
         val call = client.newCall(request)
@@ -192,7 +200,7 @@ class EpisodeDownloader(
             if (total > 0 && store.usableSpaceBytes() < total + FREE_SPACE_HEADROOM_BYTES) {
                 throw IOException("Not enough storage space")
             }
-            updateTask(episode.id) { it.copy(totalBytes = total) }
+            updateTask(episodeId) { it.copy(totalBytes = total) }
 
             var written = 0L
             var lastPublishedAt = 0L
@@ -209,7 +217,7 @@ class EpisodeDownloader(
                         if (now - lastPublishedAt >= PROGRESS_PUBLISH_MS) {
                             lastPublishedAt = now
                             val soFar = written
-                            updateTask(episode.id) { it.copy(downloadedBytes = soFar) }
+                            updateTask(episodeId) { it.copy(downloadedBytes = soFar) }
                         }
                     }
                     output.flush()
