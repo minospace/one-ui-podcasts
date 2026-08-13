@@ -19,8 +19,10 @@ import android.view.WindowManager
 import android.view.animation.PathInterpolator
 import android.widget.SeekBar
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.core.graphics.ColorUtils
+import androidx.core.text.HtmlCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -56,6 +58,9 @@ class PlayerActivity : MediaActivity() {
     private var enterTransitionStarted = false
     private var loadedArtworkUri: String? = null
 
+    private lateinit var sheet: PlayerSheet
+    private var notesEpisodeId: Long? = null
+
     private var chapters: List<Chapter> = emptyList()
     private var chaptersEpisodeId: Long? = null
     private var currentChapterIndex = -1
@@ -80,7 +85,7 @@ class PlayerActivity : MediaActivity() {
         binding.root.postDelayed({ beginEnterTransition() }, 300)
 
         binding.playerUpNext.setOnClickListener { QueueSheet.show(this) }
-        setupDragToDismiss()
+        setupSheet()
         binding.playerPlayPause.setOnClickListener { playerConnection.togglePlayPause() }
         binding.playerSkipBack.setOnClickListener { playerConnection.seekBack() }
         binding.playerSkipForward.setOnClickListener { playerConnection.seekForward() }
@@ -139,6 +144,7 @@ class PlayerActivity : MediaActivity() {
         val baseTop = content.paddingTop
         val baseRight = content.paddingRight
         val baseBottom = content.paddingBottom
+        val info = binding.playerInfo
         ViewCompat.setOnApplyWindowInsetsListener(content) { v, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(
@@ -147,6 +153,10 @@ class PlayerActivity : MediaActivity() {
                 baseRight + bars.right,
                 baseBottom + bars.bottom,
             )
+            // The notes sit outside the padded content (they're a sibling, parked off the bottom
+            // edge), so they take the side and bottom insets themselves.
+            val breath = (8 * resources.displayMetrics.density).toInt()
+            info.setPadding(bars.left, 0, bars.right, bars.bottom + breath)
             insets
         }
     }
@@ -177,61 +187,25 @@ class PlayerActivity : MediaActivity() {
     }
 
     /**
-     * Let the user drag the whole player sheet down to dismiss it — anywhere in the zone above
-     * the title (grabber, close button gap and artwork) starts the drag. Past a threshold it
-     * slides the rest of the way off-screen and finishes; otherwise it springs back.
+     * Hand the player's vertical gestures — drag down to dismiss, scroll down to open the episode
+     * notes — to [PlayerSheet]. Back closes the notes before it closes the player, so the artwork
+     * is back in place for the shared-element return transition.
      */
-    @Suppress("ClickableViewAccessibility")
-    private fun setupDragToDismiss() {
-        val easing = PathInterpolator(0.22f, 0.25f, 0f, 1f)
-        val dismissThreshold = resources.displayMetrics.density * 140f
-        val sheet = binding.root
-        var downRawY = 0f
-        var dragging = false
-        binding.playerDragZone.setOnTouchListener { _, event ->
-            when (event.actionMasked) {
-                android.view.MotionEvent.ACTION_DOWN -> {
-                    downRawY = event.rawY
-                    dragging = true
-                    sheet.animate().cancel()
-                    true
-                }
-                android.view.MotionEvent.ACTION_MOVE -> {
-                    if (!dragging) return@setOnTouchListener false
-                    val dy = (event.rawY - downRawY).coerceAtLeast(0f)
-                    sheet.translationY = dy
-                    sheet.alpha = (1f - dy / (sheet.height.coerceAtLeast(1)) * 0.6f).coerceIn(0.4f, 1f)
-                    true
-                }
-                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                    if (!dragging) return@setOnTouchListener false
-                    dragging = false
-                    if (event.actionMasked == android.view.MotionEvent.ACTION_UP &&
-                        sheet.translationY > dismissThreshold
-                    ) {
-                        sheet.animate()
-                            .translationY(sheet.height.toFloat())
-                            .alpha(0f)
-                            .setDuration(220)
-                            .setInterpolator(easing)
-                            .withEndAction {
-                                finish()
-                                overridePendingTransition(0, 0)
-                            }
-                            .start()
-                    } else {
-                        sheet.animate()
-                            .translationY(0f)
-                            .alpha(1f)
-                            .setDuration(220)
-                            .setInterpolator(easing)
-                            .start()
-                    }
-                    true
-                }
-                else -> false
-            }
+    private fun setupSheet() {
+        sheet = PlayerSheet(binding) {
+            finish()
+            overridePendingTransition(0, 0)
         }
+        sheet.attach()
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (sheet.collapse()) return
+                // Step aside for one press so the default (finish with the return transition) runs.
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+                isEnabled = true
+            }
+        })
     }
 
     private fun beginEnterTransition() {
@@ -306,7 +280,34 @@ class PlayerActivity : MediaActivity() {
         }
 
         updateChapters(MediaItems.episodeId(controller.currentMediaItem), controller.currentPosition)
+        updateNotes(MediaItems.episodeId(controller.currentMediaItem))
         updateVideo(controller)
+    }
+
+    /** Fills the notes panel when the episode changes — it's the same read on every player tick. */
+    private fun updateNotes(episodeId: Long?) {
+        if (episodeId == notesEpisodeId) return
+        notesEpisodeId = episodeId
+        binding.playerInfoScroll.scrollTo(0, 0)
+        binding.playerInfoMeta.text = ""
+        binding.playerInfoDescription.setText(R.string.episode_notes_empty)
+        if (episodeId == null) return
+        lifecycleScope.launch {
+            val episode = repository.getEpisode(episodeId)
+            // The user may have skipped to another episode while this was loading.
+            if (notesEpisodeId != episodeId || episode == null) return@launch
+            binding.playerInfoMeta.text = listOf(
+                Format.relativeDate(episode.pubDate),
+                Format.durationLabel(episode.durationMs),
+            ).filter { it.isNotBlank() }.joinToString(" · ")
+            val notes = episode.description
+                ?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_COMPACT).trim() }
+            if (notes.isNullOrBlank()) {
+                binding.playerInfoDescription.setText(R.string.episode_notes_empty)
+            } else {
+                binding.playerInfoDescription.text = notes
+            }
+        }
     }
 
     // ── Video ──────────────────────────────────────────────────────────────

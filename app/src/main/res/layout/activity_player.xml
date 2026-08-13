@@ -283,4 +283,65 @@
             android:textColor="?android:attr/textColorPrimary" />
     </LinearLayout>
 </LinearLayout>
+
+    <!--
+        Episode notes, parked just off the bottom edge. Scrolling up on the artwork slides the
+        player content up by exactly the artwork's height and brings this into the space it
+        vacates (see PlayerSheet); its height is set from that same measurement.
+        INVISIBLE, not alpha 0, so it doesn't swallow taps meant for the controls underneath.
+    -->
+    <LinearLayout
+        android:id="@+id/player_info"
+        android:layout_width="match_parent"
+        android:layout_height="240dp"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:visibility="invisible"
+        tools:visibility="visible">
+
+        <TextView
+            android:id="@+id/player_info_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="24dp"
+            android:paddingBottom="10dp"
+            android:text="@string/episode_notes"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="19sp"
+            android:textStyle="bold" />
+
+        <ScrollView
+            android:id="@+id/player_info_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:paddingHorizontal="24dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/player_info_meta"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="12sp"
+                    tools:text="3 days ago · 52 min" />
+
+                <TextView
+                    android:id="@+id/player_info_description"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingMultiplier="1.15"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textColorLink="?attr/colorPrimary"
+                    android:textSize="14sp"
+                    tools:text="@string/episode_notes_empty" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
 </FrameLayout>

@@ -9,6 +9,10 @@
     <string name="chapters">Chapters</string>
     <string name="close">Close</string>
 
+    <!-- Player -->
+    <string name="episode_notes">Episode notes</string>
+    <string name="episode_notes_empty">This episode doesn\'t have any notes.</string>
+
     <!-- Video -->
     <string name="video_show">Video</string>
     <string name="video_hide">Audio</string>
