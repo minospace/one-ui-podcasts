@@ -9,14 +9,19 @@ import be.miro.onecast.databinding.ActivityPlayerBinding
 import kotlin.math.abs
 
 /**
- * The full-screen player's vertical gestures, arbitrated in one place because they share the
- * artwork as their touch surface:
+ * The full-screen player's vertical gestures, arbitrated in one place because they share the whole
+ * player as their touch surface:
  *
- * - **Scrolling down** (finger up) on the artwork scrolls the whole player up by exactly the
- *   artwork zone's height, bringing the episode notes into the space it vacates.
- * - **Dragging down** on the artwork dismisses the player.
+ * - **Scrolling up** anywhere on the player scrolls it up by exactly the artwork zone's height,
+ *   bringing the episode notes into the space it vacates.
+ * - **Dragging down** anywhere on the player puts the notes away, or dismisses the player when
+ *   they're already down.
  * - **Dragging down** on the notes — on their header, or on the text once it's scrolled to the
- *   top — puts them away again.
+ *   top — puts them away too.
+ *
+ * The controls underneath are unaffected: a drag is only claimed from them once the finger has
+ * moved further vertically than sideways and past the touch slop, which leaves taps, the seek bar
+ * and the chip row's sideways scroll alone (see [DragInterceptLayout]).
  *
  * The sheet only ever rests in one of two states, so every release animates to whichever one it's
  * closest to: past [OPEN_FRACTION] of the way (or released with a flick) it settles open,
@@ -46,6 +51,17 @@ internal class PlayerSheet(
     private var lastRawY = 0f
     private var lastTime = 0L
 
+    /** Where the finger went down, and — from the moment the drag is ours — what it took over. */
+    private var dragStartX = 0f
+    private var dragStartY = 0f
+    private var dragStartExpansion = 0f
+    private var dragStartTranslationY = 0f
+    private var dragSlop = 0f
+    private var dragMode = Mode.UNDECIDED
+
+    /** Set once the player is on its way out, so nothing can strand it half-dismissed. */
+    private var dismissing = false
+
     val isExpanded: Boolean get() = expansion > 0f
 
     @Suppress("ClickableViewAccessibility")
@@ -53,7 +69,7 @@ internal class PlayerSheet(
         // The travel distance is whatever the artwork zone ends up with — it's the weighted child,
         // so it changes with screen size, insets and font scale. Re-measure on every layout.
         binding.playerDragZone.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> measure() }
-        bindArtworkGesture()
+        bindPlayerGesture()
         bindNotesGesture()
     }
 
@@ -138,69 +154,129 @@ internal class PlayerSheet(
 
     // ── Gestures ───────────────────────────────────────────────────────────
 
+    /**
+     * The player's own drags, taken from anywhere on it. The two halves are the same gesture: the
+     * intercept decides when it becomes ours, and the touch listener runs it — either from the
+     * moment it's claimed, or straight from the finger going down where no control wanted it (the
+     * artwork, the space around it).
+     */
     @Suppress("ClickableViewAccessibility")
-    private fun bindArtworkGesture() {
-        var downY = 0f
-        var mode = Mode.UNDECIDED
-        val sheet = binding.root
-        binding.playerDragZone.setOnTouchListener { _, event ->
-            when (event.actionMasked) {
+    private fun bindPlayerGesture() {
+        binding.playerContent.onInterceptDrag = { event ->
+            // On the way out nothing else gets a look in — see [dismissing].
+            if (dismissing) true else when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    downY = event.rawY
-                    mode = Mode.UNDECIDED
-                    settleAnimator?.cancel()
-                    sheet.animate().cancel()
-                    startTracking(event)
+                    beginDrag(event)
+                    false
                 }
                 MotionEvent.ACTION_MOVE -> {
                     track(event)
-                    val dy = event.rawY - downY
-                    if (mode == Mode.UNDECIDED && abs(dy) > touchSlop) {
-                        // Up opens the notes, down dismisses the player.
-                        mode = if (dy < 0) Mode.NOTES else Mode.DISMISS
-                    }
-                    when (mode) {
-                        // Discount the slop so the content starts moving from under the finger
-                        // rather than jumping.
-                        Mode.NOTES -> apply(((-dy - touchSlop) / panDistance).coerceIn(0f, 1f))
-                        Mode.DISMISS -> dragDismiss(dy)
-                        Mode.UNDECIDED -> Unit
-                    }
+                    claimDrag(event)
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> when (mode) {
-                    Mode.NOTES -> settle()
-                    Mode.DISMISS ->
-                        releaseDismiss(event.actionMasked == MotionEvent.ACTION_UP)
-                    Mode.UNDECIDED -> Unit
+                else -> false
+            }
+        }
+        binding.playerContent.setOnTouchListener { _, event ->
+            if (!dismissing) when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> beginDrag(event)
+                MotionEvent.ACTION_MOVE -> {
+                    track(event)
+                    if (claimDrag(event)) drag(event.rawY - dragStartY)
                 }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
+                    releaseDrag(lifted = event.actionMasked == MotionEvent.ACTION_UP)
             }
             true
         }
     }
 
+    /**
+     * Note what a touch starts from, and nothing more: most touches on the player are taps on the
+     * controls, and until one has proved itself a drag ([claimDrag]) it must leave whatever is
+     * animating alone — cancelling here would strand a settling sheet, or a player mid-dismiss, on
+     * every tap that lands during one.
+     */
+    private fun beginDrag(event: MotionEvent) {
+        dragStartX = event.rawX
+        dragStartY = event.rawY
+        dragMode = Mode.UNDECIDED
+        startTracking(event)
+    }
+
+    /** True once the finger has moved far enough, and vertically enough, for the drag to be ours. */
+    private fun claimDrag(event: MotionEvent): Boolean {
+        if (dragMode != Mode.UNDECIDED) return true
+        val dy = event.rawY - dragStartY
+        // A sideways swipe belongs to whatever is under the finger: the seek bar, the chip row.
+        if (abs(dy) <= touchSlop || abs(dy) <= abs(event.rawX - dragStartX)) return false
+        // Up always drives the notes, as does down while they're up. Only a downward pull with the
+        // notes already away means the player itself.
+        dragMode = if (dy < 0 || isExpanded) Mode.NOTES else Mode.DISMISS
+        // Now that it's a drag, take over from whatever was animating — from wherever it had got
+        // to, so the content carries on under the finger instead of snapping back to where it
+        // stood when the finger landed.
+        settleAnimator?.cancel()
+        binding.root.animate().cancel()
+        dragStartExpansion = expansion
+        dragStartTranslationY = binding.root.translationY
+        // Discount the slop the finger spent getting here so the content starts from rest. Fixed
+        // at the direction of the claim: recomputing it from the live delta would flip its sign,
+        // and jerk the content by twice the slop, whenever the finger wandered back past its
+        // starting point.
+        dragSlop = if (dy < 0) touchSlop.toFloat() else -touchSlop.toFloat()
+        return true
+    }
+
+    private fun drag(dy: Float) {
+        val travel = dy + dragSlop
+        when (dragMode) {
+            Mode.NOTES -> panTo(dragStartExpansion, travel)
+            Mode.DISMISS -> dragDismiss(dragStartTranslationY + travel)
+            Mode.UNDECIDED -> Unit
+        }
+    }
+
+    private fun releaseDrag(lifted: Boolean) {
+        when (dragMode) {
+            Mode.NOTES -> settle()
+            Mode.DISMISS -> releaseDismiss(lifted)
+            Mode.UNDECIDED -> Unit
+        }
+        dragMode = Mode.UNDECIDED
+    }
+
+    /** Moves the sheet [travel] pixels from [from], down being a close. */
+    private fun panTo(from: Float, travel: Float) {
+        if (panDistance <= 0f) return
+        apply((from - travel / panDistance).coerceIn(0f, 1f))
+    }
+
     @Suppress("ClickableViewAccessibility")
     private fun bindNotesGesture() {
-        var downY = 0f
-        var startExpansion = 1f
-        var dragging = false
+        // A drag in progress, and where it took over from. One per touch surface: shared state
+        // would let a stray second finger on one reset the other mid-drag, and the drag it
+        // interrupted would never settle.
+        val headerDrag = NotesDrag()
+        val scrollDrag = NotesDrag()
 
-        // The header is nothing but a handle, so it takes the drag as soon as it clears the slop.
+        // The header is nothing but a handle, so it takes the drag as soon as it clears the slop —
+        // but not before, so a tap on it can't cancel a settle in flight and leave the sheet
+        // stranded part-way. It re-bases on the spot, like the notes below do.
         binding.playerInfoHeader.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    downY = event.rawY
-                    startExpansion = expansion
-                    dragging = false
-                    settleAnimator?.cancel()
+                    headerDrag.downY = event.rawY
+                    headerDrag.dragging = false
                     startTracking(event)
                 }
                 MotionEvent.ACTION_MOVE -> {
                     track(event)
-                    val dy = event.rawY - downY
-                    if (!dragging && abs(dy) > touchSlop) dragging = true
-                    if (dragging) apply((startExpansion - dy / panDistance).coerceIn(0f, 1f))
+                    if (!headerDrag.dragging && abs(event.rawY - headerDrag.downY) > touchSlop) {
+                        headerDrag.take(event.rawY)
+                    }
+                    if (headerDrag.dragging) headerDrag.follow(event.rawY)
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (dragging) settle()
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (headerDrag.dragging) settle()
             }
             true
         }
@@ -212,27 +288,24 @@ internal class PlayerSheet(
         scroll.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    dragging = false
+                    scrollDrag.dragging = false
                     startTracking(event)
                     false
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val step = track(event)
-                    if (!dragging && scroll.scrollY == 0 && step > 0f) {
-                        dragging = true
-                        downY = event.rawY
-                        startExpansion = expansion
-                        settleAnimator?.cancel()
+                    if (!scrollDrag.dragging && scroll.scrollY == 0 && step > 0f) {
+                        scrollDrag.take(event.rawY)
                     }
-                    if (dragging) {
-                        apply((startExpansion - (event.rawY - downY) / panDistance).coerceIn(0f, 1f))
+                    if (scrollDrag.dragging) {
+                        scrollDrag.follow(event.rawY)
                         true
                     } else {
                         false
                     }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    if (dragging) {
+                    if (scrollDrag.dragging) {
                         settle()
                         true
                     } else {
@@ -244,11 +317,29 @@ internal class PlayerSheet(
         }
     }
 
+    /** One touch surface's claim on the sheet: where it took the drag over, and from what. */
+    private inner class NotesDrag {
+        var dragging = false
+        var downY = 0f
+        var startExpansion = 1f
+
+        /** Take the drag over here and now, from wherever a settle in flight had got to. */
+        fun take(rawY: Float) {
+            dragging = true
+            settleAnimator?.cancel()
+            downY = rawY
+            startExpansion = expansion
+        }
+
+        fun follow(rawY: Float) = panTo(startExpansion, rawY - downY)
+    }
+
     // ── Drag to dismiss ────────────────────────────────────────────────────
 
-    private fun dragDismiss(dy: Float) {
+    /** [offset] is where the player should sit, already measured from wherever the drag took over. */
+    private fun dragDismiss(offset: Float) {
         val sheet = binding.root
-        val travel = dy.coerceAtLeast(0f)
+        val travel = offset.coerceAtLeast(0f)
         sheet.translationY = travel
         sheet.alpha = (1f - travel / sheet.height.coerceAtLeast(1) * 0.6f).coerceIn(0.4f, 1f)
     }
@@ -256,6 +347,7 @@ internal class PlayerSheet(
     private fun releaseDismiss(lifted: Boolean) {
         val sheet = binding.root
         if (lifted && sheet.translationY > dismissThreshold) {
+            dismissing = true
             sheet.animate()
                 .translationY(sheet.height.toFloat())
                 .alpha(0f)

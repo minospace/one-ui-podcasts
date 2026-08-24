@@ -73,17 +73,31 @@ object VideoMode {
     }
 
     /**
-     * Keeps the episode playing when its video can't be decoded — a decoder that won't start (an
-     * unsupported profile, or no free codec on a busy device) otherwise takes the whole episode
-     * down with it, audio included. Drops back to audio from the same position and stops loading
-     * video for this episode; the user can ask for it again from the player.
+     * Keeps the episode playing when its video can't be played — video is an extra, and an
+     * ExoPlayer error otherwise stops the episode outright, audio included. Drops back to audio
+     * from the same position and stops loading video for this episode; the user can ask for it
+     * again from the player.
+     *
+     * Two different failures count, because video can break in two places:
+     *  - the **decoder** won't start (an unsupported profile, or no free codec on a busy device),
+     *    which arrives as a renderer error naming the format it choked on;
+     *  - the video **file** won't load (a dead link, a timeout, a geo-block), which arrives as a
+     *    source error naming nothing. That one is only video's fault — and only recoverable — when
+     *    the audio lives in a file of its own to fall back to, which is exactly what
+     *    [MediaItems.withVideoSource] returning something to switch to tells us. Where one file
+     *    carries both tracks it returns null, and a source error is the whole episode failing.
      *
      * Returns true when the error was video's doing and playback was restarted.
      */
     fun recoverFromError(player: Player, error: PlaybackException): Boolean {
         if (error !is ExoPlaybackException) return false
-        if (error.type != ExoPlaybackException.TYPE_RENDERER) return false
-        if (!MimeTypes.isVideo(error.rendererFormat?.sampleMimeType)) return false
+        val audioItem = player.currentMediaItem?.let { MediaItems.withVideoSource(it, false) }
+        val videoBroke = when (error.type) {
+            ExoPlaybackException.TYPE_RENDERER -> MimeTypes.isVideo(error.rendererFormat?.sampleMimeType)
+            ExoPlaybackException.TYPE_SOURCE -> audioItem != null
+            else -> false
+        }
+        if (!videoBroke) return false
 
         videoFailed = true
         // Only worth a word to the user if they were actually watching; a preloaded video that
@@ -92,7 +106,6 @@ object VideoMode {
         showing = false
         val position = player.currentPosition.coerceAtLeast(0)
         setVideoTrackEnabled(player, false)
-        val audioItem = player.currentMediaItem?.let { MediaItems.withVideoSource(it, false) }
         if (audioItem != null) player.setMediaItem(audioItem, position) else player.seekTo(position)
         player.prepare()
         return true

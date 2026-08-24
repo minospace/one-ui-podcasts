@@ -11,7 +11,9 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-<LinearLayout
+<!-- The player's vertical drags are taken here, anywhere on it, rather than by any one child
+     (see PlayerSheet) — hence the intercepting layout. -->
+<be.miro.onecast.ui.player.DragInterceptLayout
     android:id="@+id/player_content"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -19,7 +21,8 @@
     android:paddingHorizontal="24dp"
     android:paddingBottom="24dp">
 
-    <!-- Everything above the title is a single drag-to-dismiss zone. -->
+    <!-- Artwork and grabber. Also the measuring stick for how far the player slides up to make
+         room for the episode notes, so it stays one view even though it no longer owns a gesture. -->
     <LinearLayout
         android:id="@+id/player_drag_zone"
         android:layout_width="match_parent"
@@ -282,10 +285,10 @@
             android:text="Mark played"
             android:textColor="?android:attr/textColorPrimary" />
     </LinearLayout>
-</LinearLayout>
+</be.miro.onecast.ui.player.DragInterceptLayout>
 
     <!--
-        Episode notes, parked just off the bottom edge. Scrolling up on the artwork slides the
+        Episode notes, parked just off the bottom edge. Scrolling up on the player slides the
         player content up by exactly the artwork's height and brings this into the space it
         vacates (see PlayerSheet); its height is set from that same measurement.
         INVISIBLE, not alpha 0, so it doesn't swallow taps meant for the controls underneath.

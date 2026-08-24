@@ -61,7 +61,7 @@ class RssParser {
                                 val type = parser.getAttributeValue(null, "type")
                                 if (isVideo(type, url)) {
                                     if (itVideo == null) itVideo = url
-                                } else if (itAudio == null) {
+                                } else if (itAudio == null && isAudio(type, url)) {
                                     itAudio = url
                                 }
                             }
@@ -79,7 +79,7 @@ class RssParser {
                             if (url != null) {
                                 if (isVideo(altEnclosureType, url)) {
                                     if (itVideo == null) itVideo = url
-                                } else if (itAudio == null) {
+                                } else if (itAudio == null && isAudio(altEnclosureType, url)) {
                                     // An audio rendition of a video episode: worth having, so
                                     // listening (and downloading to listen) needn't carry video.
                                     itAudio = url
@@ -198,10 +198,26 @@ class RssParser {
         else -> hasVideoExtension(url)
     }
 
-    private fun hasVideoExtension(url: String): Boolean {
-        val path = url.substringBefore('?').substringBefore('#')
-        return path.substringAfterLast('.', "").lowercase() in VIDEO_EXTENSIONS
+    /**
+     * Whether a media URL points at the episode's audio. Deliberately a test in its own right and
+     * not merely "isn't video": an item can carry enclosures that are neither — a transcript, a
+     * chapters file — and taking one of those as the audio costs the episode its real enclosure
+     * (the first URL wins) and leaves it unplayable. An untyped enclosure is still taken at face
+     * value, since plenty of feeds ship the episode itself with no type at all.
+     */
+    private fun isAudio(type: String?, url: String): Boolean = when {
+        type.isNullOrBlank() -> true
+        type.startsWith("audio", true) -> true
+        type.startsWith("video", true) -> false
+        else -> hasAudioExtension(url)
     }
+
+    private fun hasVideoExtension(url: String): Boolean = extensionOf(url) in VIDEO_EXTENSIONS
+
+    private fun hasAudioExtension(url: String): Boolean = extensionOf(url) in AUDIO_EXTENSIONS
+
+    private fun extensionOf(url: String): String =
+        url.substringBefore('?').substringBefore('#').substringAfterLast('.', "").lowercase()
 
     private fun parseDate(value: String): Long {
         if (value.isBlank()) return 0
@@ -251,6 +267,9 @@ class RssParser {
 
     private companion object {
         val VIDEO_EXTENSIONS = setOf("mp4", "m4v", "mov", "webm", "mkv", "avi", "mpg", "mpeg")
+
+        // Only consulted for an enclosure whose type says nothing useful (octet-stream and friends).
+        val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "aac", "ogg", "oga", "opus", "wav", "flac", "wma")
 
         val DATE_PATTERNS = listOf(
             "EEE, dd MMM yyyy HH:mm:ss Z",

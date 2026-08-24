@@ -111,10 +111,13 @@ class PodcastRepository(
      * Drops files in the download directory that no episode row points at any more (left behind by
      * an unsubscribe or a crash mid-download), and clears rows whose file has vanished.
      */
-    suspend fun pruneDownloads(activePaths: Collection<String> = emptyList()) {
+    suspend fun pruneDownloads(activePaths: () -> Collection<String> = ::emptyList) {
         val downloaded = episodeDao.getDownloaded()
         val known = downloaded.mapNotNull { it.downloadPath }
-        downloadStore.deleteExcept(known + activePaths)
+        // Asked for here, not passed in already-evaluated: the database read above suspends, and a
+        // download started while it was in flight would be missing from a list snapshotted before
+        // it — the sweep would delete the part file out from under the running transfer.
+        downloadStore.deleteExcept(known + activePaths())
         for (episode in downloaded) {
             val path = episode.downloadPath ?: continue
             if (!File(path).exists()) episodeDao.setDownload(episode.id, null, 0, 0, false)

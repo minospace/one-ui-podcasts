@@ -187,9 +187,9 @@ class PlayerActivity : MediaActivity() {
     }
 
     /**
-     * Hand the player's vertical gestures — drag down to dismiss, scroll down to open the episode
-     * notes — to [PlayerSheet]. Back closes the notes before it closes the player, so the artwork
-     * is back in place for the shared-element return transition.
+     * Hand the player's vertical gestures — scroll up anywhere to open the episode notes, drag down
+     * to put them away or dismiss the player — to [PlayerSheet]. Back closes the notes before it
+     * closes the player, so the artwork is back in place for the shared-element return transition.
      */
     private fun setupSheet() {
         sheet = PlayerSheet(binding) {

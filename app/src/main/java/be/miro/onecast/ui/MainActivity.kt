@@ -59,7 +59,7 @@ class MainActivity : MediaActivity() {
             // and forget downloads whose file is gone.
             if (!prunedDownloads) {
                 prunedDownloads = true
-                repository.pruneDownloads(downloads.activePaths())
+                repository.pruneDownloads { downloads.activePaths() }
             }
         }
     }

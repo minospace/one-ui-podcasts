@@ -22,7 +22,7 @@ object DownloadNotifications {
 
     const val PROGRESS_NOTIFICATION_ID = 4201
 
-    private const val FAILURE_ID_BASE = 4300
+    private const val FAILURE_ID = 4300
     private const val CHANNEL_PROGRESS = "downloads_progress"
     private const val CHANNEL_ALERTS = "downloads_alerts"
 
@@ -106,11 +106,11 @@ object DownloadNotifications {
             .build()
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return
-        runCatching { manager.notify(failureId(task.episodeId), notification) }
+        runCatching { manager.notify(failureTag(task.episodeId), FAILURE_ID, notification) }
     }
 
     fun clearFailure(context: Context, episodeId: Long) {
-        NotificationManagerCompat.from(context).cancel(failureId(episodeId))
+        NotificationManagerCompat.from(context).cancel(failureTag(episodeId), FAILURE_ID)
     }
 
     private fun progressText(context: Context, task: DownloadTask?): String = when {
@@ -135,5 +135,12 @@ object DownloadNotifications {
         )
     }
 
-    private fun failureId(episodeId: Long): Int = FAILURE_ID_BASE + (episodeId % 1000).toInt()
+    /**
+     * One failure notification per episode, told apart by tag rather than by id. Folding the
+     * episode id into the int id is what a notification id looks like it wants, but ids are Ints
+     * and episode ids are unbounded Longs, so any squeeze into a fixed range collides: two episodes
+     * a multiple of the range apart would share a notification, one silently replacing the other
+     * and either one's [clearFailure] cancelling the other's. Tags are strings and don't.
+     */
+    private fun failureTag(episodeId: Long): String = "download_failure_$episodeId"
 }

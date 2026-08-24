@@ -140,47 +140,60 @@ class EpisodeDownloader(
 
     private suspend fun runDownload(task: DownloadTask) {
         val episodeId = task.episodeId
-        val episode = repository.getEpisode(episodeId)
-        if (episode == null) {
-            removeTask(episodeId)
-            return
-        }
-        if (!episode.downloadPath.isNullOrBlank() && File(episode.downloadPath).exists()) {
-            removeTask(episodeId)
-            return
-        }
-
-        updateTask(episodeId) { it.copy(state = DownloadState.RUNNING, downloadedBytes = 0, error = null) }
-        loadMetadata(episodeId)
-
-        // The video file is a different URL only when the feed publishes video separately; when the
-        // episode's one enclosure is video, the file downloaded here carries the picture regardless.
-        val url = if (task.includeVideo) episode.videoUrl ?: episode.audioUrl else episode.audioUrl
-        val hasVideo = episode.videoUrl != null && episode.videoUrl == url
-        val partFile = store.partFileFor(episodeId)
-        val targetFile = store.fileFor(episodeId, url)
+        // Published before the suspending reads below rather than after them: [cancel] reaches a
+        // download in flight only through [active], so anything begun while this was still null
+        // couldn't be stopped — the transfer would run on unseen and land as a finished file after
+        // the user had already cancelled it, and a re-queue of the same episode would then have two
+        // writers on one part file.
         val current = ActiveDownload(episodeId)
         active = current
-        val watchdog = scope.launch { watchForStall(current) }
+        var watchdog: Job? = null
         try {
-            val bytes = withContext(Dispatchers.IO) { writeToFile(episodeId, url, partFile, current) }
-            if (!partFile.renameTo(targetFile)) throw IOException("Couldn't save the downloaded file")
-            repository.setDownloaded(episodeId, targetFile.absolutePath, bytes, hasVideo)
-            removeTask(episodeId)
-        } catch (e: CancellationException) {
-            partFile.delete()
-            removeTask(episodeId)
-            throw e
-        } catch (e: Throwable) {
-            // Abort means abort: nothing half-downloaded is kept around.
-            partFile.delete()
-            if (current.cancelledByUser) {
+            val episode = repository.getEpisode(episodeId)
+            if (episode == null) {
                 removeTask(episodeId)
-            } else {
-                failTask(episodeId, describe(e, current))
+                return
+            }
+            if (!episode.downloadPath.isNullOrBlank() && File(episode.downloadPath).exists()) {
+                removeTask(episodeId)
+                return
+            }
+
+            updateTask(episodeId) { it.copy(state = DownloadState.RUNNING, downloadedBytes = 0, error = null) }
+            loadMetadata(episodeId)
+            // A cancel that arrived during those reads had no request to abort yet, so honour it here.
+            if (current.isAborted) {
+                removeTask(episodeId)
+                return
+            }
+
+            // The video file is a different URL only when the feed publishes video separately; when the
+            // episode's one enclosure is video, the file downloaded here carries the picture regardless.
+            val url = if (task.includeVideo) episode.videoUrl ?: episode.audioUrl else episode.audioUrl
+            val hasVideo = episode.videoUrl != null && episode.videoUrl == url
+            val partFile = store.partFileFor(episodeId)
+            val targetFile = store.fileFor(episodeId, url)
+            watchdog = scope.launch { watchForStall(current) }
+            try {
+                val bytes = withContext(Dispatchers.IO) { writeToFile(episodeId, url, partFile, current) }
+                if (!partFile.renameTo(targetFile)) throw IOException("Couldn't save the downloaded file")
+                repository.setDownloaded(episodeId, targetFile.absolutePath, bytes, hasVideo)
+                removeTask(episodeId)
+            } catch (e: CancellationException) {
+                partFile.delete()
+                removeTask(episodeId)
+                throw e
+            } catch (e: Throwable) {
+                // Abort means abort: nothing half-downloaded is kept around.
+                partFile.delete()
+                if (current.cancelledByUser) {
+                    removeTask(episodeId)
+                } else {
+                    failTask(episodeId, describe(e, current))
+                }
             }
         } finally {
-            watchdog.cancel()
+            watchdog?.cancel()
             active = null
         }
     }
@@ -192,7 +205,7 @@ class EpisodeDownloader(
             .header("User-Agent", USER_AGENT)
             .build()
         val call = client.newCall(request)
-        current.call = call
+        current.attach(call)
         call.execute().use { response ->
             if (!response.isSuccessful) throw IOException("Server returned HTTP ${response.code}")
             val body = response.body ?: throw IOException("The server sent no audio")
@@ -290,7 +303,10 @@ class EpisodeDownloader(
     /** The one download currently in flight, and the handles needed to abort it mid-read. */
     private class ActiveDownload(val episodeId: Long) {
         @Volatile
-        var call: Call? = null
+        private var call: Call? = null
+
+        @Volatile
+        private var aborted = false
 
         @Volatile
         var cancelledByUser = false
@@ -301,8 +317,21 @@ class EpisodeDownloader(
         @Volatile
         var lastProgressAt = SystemClock.elapsedRealtime()
 
+        /** True once [abort] has run, for the stretches of the download that have no call to cancel. */
+        val isAborted: Boolean get() = aborted
+
+        /**
+         * Hand over the request to abort through. A request handed over after [abort] has already
+         * run is cancelled on the spot, so an abort that lands while it's being built isn't lost.
+         */
+        fun attach(call: Call) {
+            this.call = call
+            if (aborted) call.cancel()
+        }
+
         /** Cancelling the call makes the blocking read throw straight away. */
         fun abort() {
+            aborted = true
             call?.cancel()
         }
     }
