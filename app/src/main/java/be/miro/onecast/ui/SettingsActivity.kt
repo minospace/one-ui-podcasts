@@ -25,6 +25,8 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Must precede inflation — the accent overlay only reaches views inflated after it.
+        ExpressiveTheme.apply(this)
         binding = ActivitySettingsBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.toolbarLayout.setNavigationButtonAsBack()
@@ -68,6 +70,13 @@ class SettingsActivity : AppCompatActivity() {
 
             // Switches the cards on/off in pure-black mode; rebuild for instant feedback too.
             findPreference<Preference>(AppSettings.KEY_AMOLED_SHOW_CARDS)?.setOnPreferenceChangeListener { _, _ ->
+                view?.post { activity?.recreate() }
+                true
+            }
+
+            // The accent overlay is layered on in onCreate, so it only reaches a freshly inflated
+            // screen; rebuild so this one recolours under the user straight away.
+            findPreference<Preference>(AppSettings.KEY_EXPRESSIVE_COLOR)?.setOnPreferenceChangeListener { _, _ ->
                 view?.post { activity?.recreate() }
                 true
             }

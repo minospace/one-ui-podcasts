@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import be.miro.onecast.databinding.ActivitySearchBinding
 import be.miro.onecast.podcastRepository
 import be.miro.onecast.ui.AmoledTheme
+import be.miro.onecast.ui.ExpressiveTheme
 import kotlinx.coroutines.launch
 
 /** Add a podcast by searching the iTunes directory or pasting an RSS feed URL. */
@@ -19,9 +20,13 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var binding: ActivitySearchBinding
     private lateinit var adapter: SearchResultAdapter
     private var amoledApplied = false
+    private var expressiveApplied = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Must precede inflation — the accent overlay only reaches views inflated after it.
+        ExpressiveTheme.apply(this)
+        expressiveApplied = ExpressiveTheme.isActive(this)
         binding = ActivitySearchBinding.inflate(layoutInflater)
         setContentView(binding.root)
         amoledApplied = AmoledTheme.isActive(this)
@@ -46,7 +51,11 @@ class SearchActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (AmoledTheme.isActive(this) != amoledApplied) recreate()
+        if (AmoledTheme.isActive(this) != amoledApplied ||
+            ExpressiveTheme.isActive(this) != expressiveApplied
+        ) {
+            recreate()
+        }
     }
 
     private fun submit() {

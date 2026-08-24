@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Filled accent circle behind the widget's play/pause icon (RemoteViews-safe, no ripple). -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="oval">
-    <solid android:color="@color/app_primary" />
-</shape>

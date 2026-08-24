@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     app:expanded="false"
-    app:title="@string/queue_title">
+    app:title="@string/downloads_title">
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -13,7 +13,7 @@
         app:layout_location="main_content">
 
         <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/queue_list"
+            android:id="@+id/download_list"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@color/oui_background_color"
@@ -32,7 +32,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/queue_empty"
+                android:text="@string/downloads_empty"
                 android:textColor="?android:attr/textColorPrimary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -42,7 +42,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:gravity="center"
-                android:text="@string/queue_empty_hint"
+                android:text="@string/downloads_empty_hint"
                 android:textColor="?android:attr/textColorSecondary"
                 android:textSize="14sp" />
         </LinearLayout>

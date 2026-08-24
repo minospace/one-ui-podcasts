@@ -15,7 +15,10 @@ data class ParsedEpisode(
     val guid: String,
     val title: String,
     val description: String?,
-    val audioUrl: String,
+    /** Null for a video-only item, which has no separate audio file. */
+    val audioUrl: String?,
+    /** The video file, when the feed publishes one. May be the same file as [audioUrl]. */
+    val videoUrl: String?,
     val pubDate: Long,
     val durationMs: Long,
     val imageUrl: String?,

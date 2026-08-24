@@ -27,12 +27,18 @@ export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
 - Android SDK lives at `/opt/homebrew/share/android-commandlinetools` (installed via
   `brew install --cask android-commandlinetools`); `local.properties` points `sdk.dir` there and
   is gitignored — regenerate it if missing: `echo "sdk.dir=/opt/homebrew/share/android-commandlinetools" > local.properties`.
-- **Bump the version only when the user asks to push** (any branch), never on an ordinary commit
-  and never as an unprompted step: `versionCode` (int, `app/build.gradle.kts`) always increments by
-  1. `versionName` is `MAJOR.MINOR.PATCH` — bump PATCH for a fix, MINOR for a new user-visible
-  feature, MAJOR for a breaking/rearchitecture change. Also update `VERSION.txt` (gitignored local
-  quick-reference, mirrors `versionCode`/`versionName`) to match — regenerate it if missing. Don't
-  push yourself — the user runs the push.
+- **Versioning happens only when the user asks to push** (any branch), never on an ordinary commit
+  and never as an unprompted step. The two fields move on different triggers:
+  - `versionCode` (int, `app/build.gradle.kts`) **always increments by 1 on a push**. It's the
+    system's upgrade counter, not a label: the package manager refuses to install over a higher
+    code, and Play rejects a repeat, so every pushed build needs its own — including betas and
+    re-cuts of the "same" release.
+  - `versionName` (`MAJOR.MINOR.PATCH`) **changes only when the user explicitly says to**, and to
+    the value they give. Don't infer a bump from the size of the change; a release can keep its
+    name across several `versionCode`s (e.g. successive betas of 2.9.0).
+  Mirror whatever you changed into `VERSION.txt` (gitignored local quick-reference of
+  `versionCode`/`versionName`) — regenerate it if missing. Don't push yourself unless asked — the
+  user normally runs the push.
 - **Always log user-visible changes in `releasenotes.txt`** (project root, gitignored): whenever a
   change adds or alters something a user would notice, append one short, user-facing bullet
   describing *what changed for them* (not the implementation). Do this automatically as part of
@@ -52,11 +58,14 @@ app/src/main/java/be/miro/onecast/
   data/        Room entities (Podcast, Episode), DAOs, AppDatabase, PodcastRepository
   feed/        ItunesSearchClient (iTunes Search API), RssParser (XmlPullParser), FeedFetcher
   playback/    PlaybackService (Media3 MediaSessionService), PlayerConnection, MediaItems
+  download/    EpisodeDownloader (queue + OkHttp), DownloadService (foreground + live
+               notification), DownloadStore (files), DownloadNotifications
   widget/      OnecastWidgetProvider, WidgetState — home-screen widget
   ui/          MediaActivity (base), MainActivity (home grid), Format, SquareImageView
     search/    SearchActivity + SearchResultAdapter   — add a podcast (iTunes search + RSS URL)
     podcast/   PodcastActivity + EpisodeAdapter        — detail screen + episode list
     player/    PlayerActivity, MiniPlayerView          — now-playing UI
+    downloads/ DownloadsActivity + DownloadsAdapter    — offline episodes + downloads in flight
     subscriptions/ PodcastGridAdapter
 ```
 
@@ -103,6 +112,28 @@ app/src/main/java/be/miro/onecast/
   views black and recolouring `RoundFrameLayout`/`RoundLinearLayout` corners. Activities call
   `recreate()` from `onResume` when the active state changed (so back-stack screens re-theme after
   the toggle). Only applies while the system is in dark mode; leave light mode alone.
+- **Material 3 Expressive accent** (Settings → "Material You colours", off by default): swaps the
+  One UI blue accent for the wallpaper-derived M3 palette (`@android:color/system_accent1_*` on API
+  31+, M3 baseline below). *Accent only* — surfaces stay One UI's flat neutral, so it composes with
+  AMOLED mode and doesn't reintroduce a grey panel. Unlike `AmoledTheme` this needs no view walking:
+  the accent is reachable via `?attr/colorPrimary`, so `ui/ExpressiveTheme.apply()` layers the
+  `ThemeOverlay.Onecast.Expressive` overlay onto the activity theme — **call it in `onCreate` before
+  `setContentView`**, since the overlay only reaches views inflated after it. `MediaActivity` does
+  this for its five subclasses; `SearchActivity`/`SettingsActivity` do it themselves. Back-stack
+  screens `recreate()` from `onResume` on change, same as AMOLED.
+  **Nothing should reference `@color/app_primary` directly** — use `?attr/colorPrimary` (or
+  `ExpressiveTheme.accent()` from code), or that element stays blue while the rest of the app moves.
+  The home-screen widget is the deliberate exception: it's always Material You on API 31+ and
+  ignores this toggle, because a launcher-hosted widget can't read the app's theme or settings at
+  inflate time.
+- **Bottom sheets** (`ui/queue/QueueSheet`, the Up Next queue): the SESL Material fork ships
+  `BottomSheetDialogFragment`, so use it — there's no One UI sheet in oneui-design. Two things to
+  copy: the fragment's own theme (`Onecast.BottomSheetDialog`) only strips the modal's background so
+  `@drawable/bg_bottom_sheet` shows through, and the content is inflated with
+  `inflater.cloneInContext(requireActivity())` — a dialog theme is applied *on top of* the
+  activity's, so inflating with the dialog's context would override the One UI day/night colours and
+  the Expressive accent overlay with Material's defaults. AMOLED is handled by tinting the sheet
+  background black in `onViewCreated` (no view walking needed — the sheet paints its own surface).
 
 ## Playback gotchas
 
@@ -111,6 +142,26 @@ app/src/main/java/be/miro/onecast/
   `DefaultHttpDataSource` must have `setAllowCrossProtocolRedirects(true)` (wired in
   `PlaybackService.onCreate`) or playback fails with a generic "Source error". Manifest also
   needs `android:usesCleartextTraffic="true"`.
+- That same redirect chain is the bulk of the wait before the first sound, and ExoPlayer opens a
+  URL several times per episode (header read, then again from a byte offset on every seek/resume,
+  and after a network hiccup). `RedirectCachingDataSource` wraps the data source and remembers
+  where each URL landed, so only the first open pays the chain; entries are process-scoped and a
+  failed shortcut falls back to the original URL, because CDN links are often signed and expire.
+- **Video episodes** (`playback/VideoMode`): a video podcast almost always ships *one* enclosure
+  (`type="video/mp4"`) carrying both tracks — a separate audio file only appears via Podcasting 2.0
+  `<podcast:alternateEnclosure>` or Media RSS. So switching between watching and listening is mostly
+  a **track-selection** change (`setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, …)`), and only swaps the
+  media item when the two sources are genuinely different files. Both URLs ride along in the media
+  item's metadata extras (`MediaItems`), so the player screen can switch without a database read.
+  Video is transient, never persisted: every episode starts as audio, and `PlaybackService` clears
+  the flag on a media-item transition *to a different episode id* (a source swap keeps the id).
+  Settings → "Preload video" keeps the video track enabled while listening so switching is instant;
+  turning it off means re-enabling the track mid-episode, which re-buffers. **A video renderer
+  failure must never cost the audio** — `VideoMode.recoverFromError` catches the renderer-level
+  `ExoPlaybackException`, disables video and re-prepares, because an ExoPlayer error otherwise stops
+  the whole episode (seen for real: a device with no free/capable H.264 decoder).
+  The player draws into a `TextureView`, not a `SurfaceView`: the player screen is a sheet the user
+  drags and fades, which a surface wouldn't follow.
 - A `BroadcastReceiver`'s `Context` (including `AppWidgetProvider.onReceive`, even after
   `goAsync()`) is **bind-restricted** — `MediaController.Builder(context, token).buildAsync()`
   throws `ReceiverCallNotAllowedException` if given the receiver's own context. Always pass
@@ -149,6 +200,20 @@ emulator @podcast_test -no-window -no-audio -no-snapshot -no-boot-anim \
 **Implemented**: add podcast (iTunes search + RSS URL), subscriptions grid, podcast detail with
 swipe-refresh, streaming playback (background service, lock-screen controls, skip ±, speed),
 mini-player + full player with a shared-element artwork transition, mark played (manual/bulk/auto),
-resume positions, home-screen widget, light/dark following the system.
+resume positions, home-screen widget, light/dark following the system, optional Material You accent
+and pure-black dark mode, episode downloads/offline
+playback, video podcasts (audio first, with a toggle to watch).
 
-**Deliberately deferred** (don't add speculatively): episode downloads/offline
+**Downloads**: strictly user-initiated — there is no auto-download and none should be added. An
+episode with video asks before downloading: a choice of versions when audio and video are separate
+files, otherwise a confirmation that the (much larger) video file is what gets saved;
+`episodes.downloadHasVideo` records which one landed on disk.
+`EpisodeDownloader` runs one download at a time off an in-memory queue (progress is far too chatty
+to persist; only the finished file's path/size/timestamp land on the `episodes` row).
+`DownloadService` exists solely to hold the foreground-service notification that mirrors that queue
+— it stops itself the moment nothing is queued or running. A download writes to a `.part` file that
+is renamed into place only on success, so a partial file is never mistaken for a finished one; any
+failure (HTTP error, truncated transfer, OkHttp read timeout, or the stall watchdog that fires when
+bytes stop arriving for 60s) deletes the partial, notifies the user with the reason, and leaves a
+retry row on the Downloads screen. `MainActivity` sweeps orphaned files once per process
+(`PodcastRepository.pruneDownloads`), which is what catches leftovers from a process death.

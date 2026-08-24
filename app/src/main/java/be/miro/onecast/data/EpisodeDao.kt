@@ -70,4 +70,37 @@ interface EpisodeDao {
     /** Backfills per-episode artwork onto a row that already existed before image support. */
     @Query("UPDATE episodes SET imageUrl = :imageUrl WHERE podcastId = :podcastId AND guid = :guid AND imageUrl IS NULL")
     suspend fun backfillImage(podcastId: Long, guid: String, imageUrl: String?)
+
+    /** Backfills the video URL onto a row that already existed before video support. */
+    @Query("UPDATE episodes SET videoUrl = :videoUrl WHERE podcastId = :podcastId AND guid = :guid AND videoUrl IS NULL")
+    suspend fun backfillVideo(podcastId: Long, guid: String, videoUrl: String?)
+
+    // ── Downloads ──────────────────────────────────────────────────────────
+
+    /** Downloaded episodes, newest download first, each carrying its podcast title + artwork. */
+    @Query(
+        "SELECT e.*, p.title AS podcastTitle, p.artworkUrl AS podcastArtwork " +
+            "FROM episodes e " +
+            "INNER JOIN podcasts p ON e.podcastId = p.id " +
+            "WHERE e.downloadPath IS NOT NULL " +
+            "ORDER BY e.downloadedAt DESC",
+    )
+    fun observeDownloaded(): Flow<List<EpisodeWithPodcast>>
+
+    /** Ids of the episodes that have a downloaded file (cheap badge check for episode lists). */
+    @Query("SELECT id FROM episodes WHERE downloadPath IS NOT NULL")
+    fun observeDownloadedIds(): Flow<List<Long>>
+
+    @Query("SELECT * FROM episodes WHERE downloadPath IS NOT NULL")
+    suspend fun getDownloaded(): List<Episode>
+
+    @Query("SELECT * FROM episodes WHERE podcastId = :podcastId AND downloadPath IS NOT NULL")
+    suspend fun getDownloadedForPodcast(podcastId: Long): List<Episode>
+
+    /** Records a finished download; passing nulls/zeroes clears it again. */
+    @Query(
+        "UPDATE episodes SET downloadPath = :path, downloadSizeBytes = :sizeBytes, " +
+            "downloadedAt = :downloadedAt, downloadHasVideo = :hasVideo WHERE id = :id",
+    )
+    suspend fun setDownload(id: Long, path: String?, sizeBytes: Long, downloadedAt: Long, hasVideo: Boolean)
 }

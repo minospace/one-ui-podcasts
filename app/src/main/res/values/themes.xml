@@ -19,6 +19,38 @@
         <item name="android:navigationBarColor">@color/app_content_background</item>
     </style>
 
+    <!-- Opt-in Material 3 Expressive accent (Settings → "Material You colours"). Applied at runtime
+         with `Theme.applyStyle` by ui/ExpressiveTheme rather than declared in the manifest, so it
+         layers over whichever base theme an activity already has (AppTheme or PlayerTheme) without
+         needing an Expressive twin of each. Parent is empty on purpose: an overlay must contribute
+         only the handful of attributes below, not a whole theme's worth of defaults.
+
+         Accent attributes only. colorPrimaryDark is deliberately left alone — OneUITheme paints the
+         status bar from the window background, and tinting it here would put a wallpaper-coloured
+         band above the content and break the flat single-surface rule. -->
+    <style name="ThemeOverlay.Onecast.Expressive" parent="">
+        <item name="colorPrimary">@color/app_primary_expressive</item>
+        <!-- appcompat/SESL tint their controls (switches, checkboxes, sliders, text-selection
+             handles) from colorAccent, not colorPrimary, so both have to move together or the
+             Settings switches would stay blue on an otherwise recoloured screen. -->
+        <item name="colorAccent">@color/app_primary_expressive</item>
+        <item name="android:colorAccent">@color/app_primary_expressive</item>
+    </style>
+
+    <!-- Bottom sheets (Up Next). Only the dialog window comes from here: the sheet's *content* is
+         inflated with the host activity's context (see QueueSheet), so the One UI day/night colours
+         and the optional Expressive accent still resolve. The modal's own background is cleared so
+         the rounded @drawable/bg_bottom_sheet surface shows through. -->
+    <style name="Onecast.BottomSheetDialog" parent="Theme.Design.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Onecast.BottomSheet</item>
+        <item name="android:navigationBarColor">@color/app_content_background</item>
+    </style>
+
+    <style name="Onecast.BottomSheet" parent="Widget.Design.BottomSheet.Modal">
+        <item name="android:background">@android:color/transparent</item>
+        <item name="behavior_peekHeight">auto</item>
+    </style>
+
     <!-- Full player: translucent so the screen behind shows through while the user drags the
          sheet down to dismiss it. The player's own root paints an opaque surface, so the
          translucency is only visible in the gap the sheet vacates during a drag. -->

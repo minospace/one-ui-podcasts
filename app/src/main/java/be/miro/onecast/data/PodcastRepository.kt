@@ -1,5 +1,6 @@
 package be.miro.onecast.data
 
+import be.miro.onecast.download.DownloadStore
 import be.miro.onecast.feed.ChaptersClient
 import be.miro.onecast.feed.FeedFetcher
 import be.miro.onecast.feed.ItunesSearchClient
@@ -7,12 +8,14 @@ import be.miro.onecast.feed.ParsedFeed
 import be.miro.onecast.feed.PodcastSearchResult
 import kotlinx.coroutines.flow.Flow
 import okhttp3.OkHttpClient
+import java.io.File
 
 /** Single source of truth: wraps the DAOs and the network feed/search clients. */
 class PodcastRepository(
     private val podcastDao: PodcastDao,
     private val episodeDao: EpisodeDao,
     private val queueDao: QueueDao,
+    private val downloadStore: DownloadStore,
     httpClient: OkHttpClient = OkHttpClient(),
 ) {
     private val feedFetcher = FeedFetcher(httpClient)
@@ -73,11 +76,57 @@ class PodcastRepository(
         }
     }
 
-    suspend fun unsubscribe(podcastId: Long) = podcastDao.deleteById(podcastId)
+    /** Unsubscribing throws away the episode rows, so their downloaded files go with them. */
+    suspend fun unsubscribe(podcastId: Long) {
+        for (episode in episodeDao.getDownloadedForPodcast(podcastId)) {
+            downloadStore.delete(episode.downloadPath)
+        }
+        podcastDao.deleteById(podcastId)
+    }
+
+    // ── Downloads ──────────────────────────────────────────────────────────
+
+    fun observeDownloads(): Flow<List<EpisodeWithPodcast>> = episodeDao.observeDownloaded()
+    fun observeDownloadedEpisodeIds(): Flow<List<Long>> = episodeDao.observeDownloadedIds()
+
+    /** Records a completed download; [hasVideo] is true when the saved file carries the video track. */
+    suspend fun setDownloaded(episodeId: Long, path: String, sizeBytes: Long, hasVideo: Boolean) =
+        episodeDao.setDownload(episodeId, path, sizeBytes, System.currentTimeMillis(), hasVideo)
+
+    /** Deletes an episode's downloaded audio; the episode itself (and its progress) stays. */
+    suspend fun deleteDownload(episodeId: Long) {
+        val episode = episodeDao.getById(episodeId) ?: return
+        downloadStore.delete(episode.downloadPath)
+        episodeDao.setDownload(episodeId, null, 0, 0, false)
+    }
+
+    suspend fun deleteAllDownloads() {
+        for (episode in episodeDao.getDownloaded()) {
+            downloadStore.delete(episode.downloadPath)
+            episodeDao.setDownload(episode.id, null, 0, 0, false)
+        }
+    }
+
+    /**
+     * Drops files in the download directory that no episode row points at any more (left behind by
+     * an unsubscribe or a crash mid-download), and clears rows whose file has vanished.
+     */
+    suspend fun pruneDownloads(activePaths: () -> Collection<String> = ::emptyList) {
+        val downloaded = episodeDao.getDownloaded()
+        val known = downloaded.mapNotNull { it.downloadPath }
+        // Asked for here, not passed in already-evaluated: the database read above suspends, and a
+        // download started while it was in flight would be missing from a list snapshotted before
+        // it — the sweep would delete the part file out from under the running transfer.
+        downloadStore.deleteExcept(known + activePaths())
+        for (episode in downloaded) {
+            val path = episode.downloadPath ?: continue
+            if (!File(path).exists()) episodeDao.setDownload(episode.id, null, 0, 0, false)
+        }
+    }
 
     // ── Up Next queue ──────────────────────────────────────────────────────
 
-    fun observeQueue(): Flow<List<QueuedEpisode>> = queueDao.observeQueue()
+    fun observeQueue(): Flow<List<EpisodeWithPodcast>> = queueDao.observeQueue()
     fun observeQueueEpisodeIds(): Flow<List<Long>> = queueDao.observeEpisodeIds()
 
     /** Append an episode to the end of the queue (no-op if already queued). */
@@ -164,7 +213,10 @@ class PodcastRepository(
                 guid = e.guid,
                 title = e.title,
                 description = e.description,
-                audioUrl = e.audioUrl,
+                // A video-only item has no audio enclosure to fall back on: play the video file
+                // (its audio track) rather than dropping the episode.
+                audioUrl = e.audioUrl ?: e.videoUrl.orEmpty(),
+                videoUrl = e.videoUrl,
                 pubDate = e.pubDate,
                 durationMs = e.durationMs,
                 imageUrl = e.imageUrl,
@@ -182,6 +234,9 @@ class PodcastRepository(
             }
             if (e.imageUrl != null) {
                 episodeDao.backfillImage(podcastId, e.guid, e.imageUrl)
+            }
+            if (e.videoUrl != null) {
+                episodeDao.backfillVideo(podcastId, e.guid, e.videoUrl)
             }
         }
     }

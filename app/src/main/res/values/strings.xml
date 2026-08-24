@@ -9,6 +9,17 @@
     <string name="chapters">Chapters</string>
     <string name="close">Close</string>
 
+    <!-- Player -->
+    <string name="episode_notes">Episode notes</string>
+    <string name="episode_notes_empty">This episode doesn\'t have any notes.</string>
+
+    <!-- Video -->
+    <string name="video_show">Video</string>
+    <string name="video_hide">Audio</string>
+    <string name="video_label">Video</string>
+    <string name="video_loading">Loading video…</string>
+    <string name="video_failed">Couldn\'t play the video — keeping the audio going</string>
+
     <!-- Up Next queue -->
     <string name="queue_title">Up Next</string>
     <string name="action_queue">Up Next</string>
@@ -18,11 +29,47 @@
     <string name="queue_add">Add to Up Next</string>
     <string name="queue_remove">Remove from Up Next</string>
     <string name="queue_clear">Clear Up Next</string>
+    <string name="queue_clear_short">Clear</string>
     <string name="queue_clear_message">Remove all episodes from Up Next?</string>
     <string name="queue_remove_item">Remove</string>
     <string name="queue_added">Added to Up Next</string>
     <string name="queue_added_next">Playing next</string>
     <string name="queue_removed">Removed from Up Next</string>
+
+    <!-- Downloads -->
+    <string name="downloads_title">Downloads</string>
+    <string name="action_downloads">Downloads</string>
+    <string name="downloads_empty">Nothing downloaded</string>
+    <string name="downloads_empty_hint">Long-press an episode and choose Download to keep it on your phone. Episodes are only ever downloaded when you ask.</string>
+    <string name="downloads_download">Download</string>
+    <string name="download_video_choice_message">This episode has video. The video file is a lot bigger — audio only is enough for listening.</string>
+    <string name="download_video_choice_video">Video and audio</string>
+    <string name="download_video_choice_audio">Audio only</string>
+    <string name="download_video_only_message">This episode is published as a video, so downloading it saves the video file — much bigger than an audio episode. Download it anyway?</string>
+    <string name="downloads_delete">Delete download</string>
+    <string name="downloads_delete_message">Delete the downloaded file for \"%1$s\"? The episode stays in the list and can be streamed or downloaded again.</string>
+    <string name="downloads_delete_all">Delete all downloads</string>
+    <plurals name="downloads_delete_all_message">
+        <item quantity="one">Delete %1$d downloaded episode (%2$s)?</item>
+        <item quantity="other">Delete all %1$d downloaded episodes (%2$s)?</item>
+    </plurals>
+    <string name="downloads_deleted">Download deleted</string>
+    <string name="downloads_deleted_all">All downloads deleted</string>
+    <string name="downloads_started">Downloading…</string>
+    <string name="downloads_cancelled">Download cancelled</string>
+    <string name="downloads_failed_row">Download failed · %1$s · Tap to retry</string>
+    <string name="download_cancel">Cancel</string>
+    <string name="download_cancel_all">Cancel all</string>
+    <string name="download_cancel_download">Cancel download</string>
+    <string name="download_preparing">Preparing download…</string>
+    <string name="download_waiting">Waiting to download…</string>
+    <string name="download_progress_bytes">%1$s of %2$s</string>
+    <string name="download_queue_count">%1$d in queue</string>
+    <string name="download_failed">Download failed</string>
+    <string name="download_failed_detail">%1$s · %2$s</string>
+    <string name="download_this_episode">This episode</string>
+    <string name="download_channel_progress">Downloads</string>
+    <string name="download_channel_alerts">Download problems</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -33,10 +80,15 @@
     <string name="settings_section_speed">Playback speed</string>
     <string name="settings_speeds_title">Available speeds</string>
     <string name="settings_speeds_empty">None selected</string>
+    <string name="settings_section_video">Video</string>
+    <string name="settings_preload_video_title">Preload video</string>
+    <string name="settings_preload_video_summary">Keep a video episode\'s picture loaded while you\'re only listening, so switching to video is instant. Turn this off to load video only once you switch to it — switching then pauses to buffer first.</string>
     <string name="settings_section_queue">Up Next</string>
     <string name="settings_autoqueue_title">Queue newer episodes</string>
     <string name="settings_autoqueue_summary">When you start an episode, automatically add that podcast\'s newer unplayed episodes to Up Next, oldest first.</string>
     <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_expressive_title">Material You colours</string>
+    <string name="settings_expressive_summary">Tint the accent with the Material 3 Expressive palette taken from your wallpaper, instead of the One UI blue. Backgrounds stay unchanged.</string>
     <string name="settings_amoled_title">Pure black dark mode</string>
     <string name="settings_amoled_summary">Use a true-black background in dark mode. Saves power and looks best on AMOLED screens; no effect in light mode.</string>
     <string name="settings_amoled_cards_title">Show grouped cards</string>

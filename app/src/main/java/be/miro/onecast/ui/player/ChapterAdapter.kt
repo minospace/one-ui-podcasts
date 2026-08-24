@@ -5,7 +5,6 @@ import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
@@ -42,12 +41,10 @@ class ChapterAdapter(
     inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
         private val title: TextView = view.findViewById(R.id.chapter_title)
         private val start: TextView = view.findViewById(R.id.chapter_start)
-        private val nowPlaying: ImageView = view.findViewById(R.id.chapter_now_playing)
 
         fun bind(chapter: Chapter, isCurrent: Boolean) {
             title.text = chapter.title
             start.text = Format.clock(chapter.startMs)
-            nowPlaying.visibility = if (isCurrent) View.VISIBLE else View.INVISIBLE
             val color = if (isCurrent) {
                 itemView.context.themeColor(androidx.appcompat.R.attr.colorPrimary)
             } else {

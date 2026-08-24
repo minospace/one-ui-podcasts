@@ -86,7 +86,9 @@ class MiniPlayerView @JvmOverloads constructor(
         subtitle.text = md.artist ?: ""
         // Use playWhenReady (intent), not isPlaying, so the icon flips immediately on tap even while
         // the stream is still buffering — otherwise it looks unresponsive and invites repeated taps.
-        playPause.setImageResource(if (c.playWhenReady) R.drawable.ic_pause else R.drawable.ic_play)
+        playPause.setImageResource(
+            if (c.playWhenReady) R.drawable.ic_pause_rounded else R.drawable.ic_play_rounded,
+        )
         // Before the stream loads the player's duration is unknown; fall back to the duration carried
         // in the media item so the bar shows the saved position instead of snapping to the start.
         val duration = c.duration.takeIf { it > 0 } ?: MediaItems.durationMs(item)
@@ -95,9 +97,12 @@ class MiniPlayerView @JvmOverloads constructor(
         val artworkUri = md.artworkUri?.toString()
         if (artworkUri != loadedArtworkUri) {
             loadedArtworkUri = artworkUri
+            // Keep the artwork corners concentric with the card: the card's 20dp radius minus its
+            // 8dp padding leaves a 12dp inner radius, which also matches the placeholder drawable.
+            val artRadius = (12 * resources.displayMetrics.density).toInt()
             Glide.with(art)
                 .load(md.artworkUri)
-                .transform(RoundedCorners(16))
+                .transform(RoundedCorners(artRadius))
                 .placeholder(R.drawable.bg_art_placeholder)
                 .into(art)
         }

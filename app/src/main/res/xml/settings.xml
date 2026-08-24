@@ -36,6 +36,16 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory app:title="@string/settings_section_video">
+
+        <SwitchPreferenceCompat
+            app:key="preload_video"
+            app:title="@string/settings_preload_video_title"
+            app:summary="@string/settings_preload_video_summary"
+            app:defaultValue="true" />
+
+    </PreferenceCategory>
+
     <PreferenceCategory app:title="@string/settings_section_queue">
 
         <SwitchPreferenceCompat
@@ -47,6 +57,12 @@
     </PreferenceCategory>
 
     <PreferenceCategory app:title="@string/settings_section_appearance">
+
+        <SwitchPreferenceCompat
+            app:key="expressive_color"
+            app:title="@string/settings_expressive_title"
+            app:summary="@string/settings_expressive_summary"
+            app:defaultValue="false" />
 
         <SwitchPreferenceCompat
             app:key="amoled_black"

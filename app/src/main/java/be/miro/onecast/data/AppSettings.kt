@@ -41,6 +41,14 @@ class AppSettings(private val prefs: SharedPreferences) {
         get() = prefs.getString(KEY_FORWARD_SECONDS, null)?.toIntOrNull() ?: DEFAULT_FORWARD_SECONDS
 
     /**
+     * Keep a video episode's video loaded while the user is only listening, so switching to video
+     * is instant. Off, video is only loaded once the user asks for it — which saves the work of
+     * carrying video nobody is watching, at the cost of a pause to buffer when they switch.
+     */
+    val preloadVideo: Boolean
+        get() = prefs.getBoolean(KEY_PRELOAD_VIDEO, true)
+
+    /**
      * Use a true-black background in dark mode (saves power on AMOLED screens). Only takes effect
      * while the system is in dark mode; the day theme is unaffected.
      */
@@ -54,6 +62,14 @@ class AppSettings(private val prefs: SharedPreferences) {
      */
     val amoledShowCards: Boolean
         get() = prefs.getBoolean(KEY_AMOLED_SHOW_CARDS, false)
+
+    /**
+     * Draw the accent in the Material 3 Expressive palette instead of the One UI signature blue.
+     * On Android 12+ that palette is derived from the wallpaper; below it falls back to the M3
+     * baseline. Surfaces stay One UI's flat neutral either way — only the accent moves.
+     */
+    val expressiveColor: Boolean
+        get() = prefs.getBoolean(KEY_EXPRESSIVE_COLOR, false)
 
     /**
      * The playback speeds the player cycles through, sorted ascending. The user picks which ones
@@ -83,10 +99,12 @@ class AppSettings(private val prefs: SharedPreferences) {
         private const val KEY_HIDE_PLAYED = "hide_played_episodes"
         private const val KEY_AUTO_QUEUE_NEWER = "auto_queue_newer"
         private const val KEY_LAST_EPISODE = "last_episode_id"
+        const val KEY_PRELOAD_VIDEO = "preload_video"
         const val KEY_REWIND_SECONDS = "rewind_seconds"
         const val KEY_FORWARD_SECONDS = "forward_seconds"
         const val KEY_AMOLED_BLACK = "amoled_black"
         const val KEY_AMOLED_SHOW_CARDS = "amoled_show_cards"
+        const val KEY_EXPRESSIVE_COLOR = "expressive_color"
         const val KEY_PLAYBACK_SPEEDS = "playback_speeds"
 
         const val DEFAULT_REWIND_SECONDS = 15

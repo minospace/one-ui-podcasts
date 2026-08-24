@@ -18,10 +18,12 @@ import be.miro.onecast.R
 import be.miro.onecast.data.Episode
 import be.miro.onecast.data.Podcast
 import be.miro.onecast.databinding.ActivityPodcastBinding
+import be.miro.onecast.download.DownloadState
 import be.miro.onecast.playback.MediaItems
 import be.miro.onecast.ui.MediaActivity
+import be.miro.onecast.ui.downloads.DownloadsActivity
 import be.miro.onecast.ui.player.PlayerActivity
-import be.miro.onecast.ui.queue.QueueActivity
+import be.miro.onecast.ui.queue.QueueSheet
 import kotlinx.coroutines.launch
 
 class PodcastActivity : MediaActivity() {
@@ -95,6 +97,14 @@ class PodcastActivity : MediaActivity() {
                         queuedIds = ids.toHashSet()
                     }
                 }
+                launch {
+                    downloads.tasks.collect { tasks ->
+                        adapter.setDownloadingIds(
+                            tasks.filter { it.state != DownloadState.FAILED }
+                                .mapTo(HashSet()) { it.episodeId },
+                        )
+                    }
+                }
             }
         }
     }
@@ -115,9 +125,8 @@ class PodcastActivity : MediaActivity() {
     }
 
     private fun play(episode: Episode) {
-        val item = MediaItems.fromEpisode(episode, podcast)
         val startAt = if (episode.isPlayed) 0L else episode.positionMs
-        playerConnection.loadEpisode(item, startAt)
+        playerConnection.loadEpisode(episode, podcast, startAt)
         // Starting an episode makes it "current", so drop it from the queue and (if enabled) line up
         // this podcast's newer unplayed episodes behind it.
         lifecycleScope.launch { repository.onEpisodeStarted(episode.id, settings.autoQueueNewer) }
@@ -127,7 +136,7 @@ class PodcastActivity : MediaActivity() {
         lifecycleScope.launch { repository.setPlayed(episode.id, !episode.isPlayed) }
     }
 
-    /** Long-press an episode: quick queue actions (play next / add / remove). */
+    /** Long-press an episode: quick queue and download actions. */
     private fun showEpisodeMenu(episode: Episode, anchor: View) {
         val popup = PopupMenu(this, anchor)
         popup.menu.add(0, MENU_PLAY_NEXT, 0, R.string.queue_play_next)
@@ -136,15 +145,73 @@ class PodcastActivity : MediaActivity() {
         } else {
             popup.menu.add(0, MENU_ADD, 1, R.string.queue_add)
         }
+        when {
+            downloads.isPending(episode.id) ->
+                popup.menu.add(0, MENU_CANCEL_DOWNLOAD, 2, R.string.download_cancel_download)
+            episode.downloadPath != null ->
+                popup.menu.add(0, MENU_DELETE_DOWNLOAD, 2, R.string.downloads_delete)
+            else -> popup.menu.add(0, MENU_DOWNLOAD, 2, R.string.downloads_download)
+        }
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_PLAY_NEXT -> queueAction(episode, R.string.queue_added_next) { repository.playNext(it) }
                 MENU_ADD -> queueAction(episode, R.string.queue_added) { repository.addToQueue(it) }
                 MENU_REMOVE -> queueAction(episode, R.string.queue_removed) { repository.removeFromQueue(it) }
+                MENU_DOWNLOAD -> {
+                    startDownload(episode)
+                    true
+                }
+                MENU_CANCEL_DOWNLOAD -> {
+                    downloads.cancel(episode.id)
+                    toast(getString(R.string.downloads_cancelled))
+                    true
+                }
+                MENU_DELETE_DOWNLOAD -> queueAction(episode, R.string.downloads_deleted) {
+                    repository.deleteDownload(it)
+                }
                 else -> false
             }
         }
         popup.show()
+    }
+
+    /**
+     * Download an episode, letting the user decide what to do about video first.
+     *
+     * When the feed publishes video as its own file alongside the audio, that's a straight choice
+     * between the two. When the episode *is* a video file (the usual case — one enclosure carrying
+     * both tracks) there's no audio-only version to fetch, so the choice is only whether to accept
+     * a video-sized download at all.
+     */
+    private fun startDownload(episode: Episode) {
+        val builder = AlertDialog.Builder(this).setTitle(R.string.downloads_download)
+        when {
+            // Buttons rather than a list: a dialog shows either its message or a list of items,
+            // never both, and the size warning is the whole point of asking.
+            episode.hasSeparateVideoFile -> builder
+                .setMessage(R.string.download_video_choice_message)
+                .setPositiveButton(R.string.download_video_choice_video) { _, _ ->
+                    enqueueDownload(episode, includeVideo = true)
+                }
+                .setNegativeButton(R.string.download_video_choice_audio) { _, _ ->
+                    enqueueDownload(episode, includeVideo = false)
+                }
+                .setNeutralButton(android.R.string.cancel, null)
+                .show()
+            episode.hasVideo -> builder
+                .setMessage(R.string.download_video_only_message)
+                .setPositiveButton(R.string.download_video_choice_video) { _, _ ->
+                    enqueueDownload(episode, includeVideo = true)
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            else -> enqueueDownload(episode, includeVideo = false)
+        }
+    }
+
+    private fun enqueueDownload(episode: Episode, includeVideo: Boolean) {
+        downloads.enqueue(episode.id, includeVideo)
+        toast(getString(R.string.downloads_started))
     }
 
     private fun queueAction(
@@ -191,7 +258,11 @@ class PodcastActivity : MediaActivity() {
             true
         }
         R.id.action_queue -> {
-            QueueActivity.start(this)
+            QueueSheet.show(this)
+            true
+        }
+        R.id.action_downloads -> {
+            DownloadsActivity.start(this)
             true
         }
         R.id.action_hide_played -> {
@@ -251,6 +322,9 @@ class PodcastActivity : MediaActivity() {
         private const val MENU_PLAY_NEXT = 1
         private const val MENU_ADD = 2
         private const val MENU_REMOVE = 3
+        private const val MENU_DOWNLOAD = 4
+        private const val MENU_CANCEL_DOWNLOAD = 5
+        private const val MENU_DELETE_DOWNLOAD = 6
 
         fun start(context: Context, podcastId: Long) {
             context.startActivity(

@@ -11,7 +11,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import be.miro.onecast.R
 import be.miro.onecast.data.Episode
-import be.miro.onecast.data.QueuedEpisode
+import be.miro.onecast.data.EpisodeWithPodcast
 import be.miro.onecast.ui.Format
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners
@@ -20,7 +20,7 @@ import com.bumptech.glide.load.resource.bitmap.RoundedCorners
 class QueueAdapter(
     private val onPlay: (Episode) -> Unit,
     private val onRemove: (Episode) -> Unit,
-) : ListAdapter<QueuedEpisode, QueueAdapter.QueueHolder>(DIFF) {
+) : ListAdapter<EpisodeWithPodcast, QueueAdapter.QueueHolder>(DIFF) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): QueueHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_queue, parent, false)
@@ -35,7 +35,7 @@ class QueueAdapter(
         private val subtitle: TextView = view.findViewById(R.id.queue_subtitle)
         private val remove: ImageButton = view.findViewById(R.id.queue_remove)
 
-        fun bind(item: QueuedEpisode) {
+        fun bind(item: EpisodeWithPodcast) {
             val episode = item.episode
             title.text = episode.title
             subtitle.text = buildSubtitle(item)
@@ -48,7 +48,7 @@ class QueueAdapter(
             remove.setOnClickListener { onRemove(episode) }
         }
 
-        private fun buildSubtitle(item: QueuedEpisode): String {
+        private fun buildSubtitle(item: EpisodeWithPodcast): String {
             val parts = mutableListOf(item.podcastTitle)
             Format.durationLabel(item.episode.durationMs).takeIf { it.isNotBlank() }?.let { parts += it }
             return parts.joinToString("  ·  ")
@@ -56,11 +56,11 @@ class QueueAdapter(
     }
 
     private companion object {
-        val DIFF = object : DiffUtil.ItemCallback<QueuedEpisode>() {
-            override fun areItemsTheSame(old: QueuedEpisode, new: QueuedEpisode) =
+        val DIFF = object : DiffUtil.ItemCallback<EpisodeWithPodcast>() {
+            override fun areItemsTheSame(old: EpisodeWithPodcast, new: EpisodeWithPodcast) =
                 old.episode.id == new.episode.id
 
-            override fun areContentsTheSame(old: QueuedEpisode, new: QueuedEpisode) = old == new
+            override fun areContentsTheSame(old: EpisodeWithPodcast, new: EpisodeWithPodcast) = old == new
         }
     }
 }

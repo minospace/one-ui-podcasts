@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material You (Material 3) widget palette — light. Android 12+ exposes the wallpaper-derived
+     tonal palettes as public colour resources, which is exactly how Google's own home-screen
+     widgets tint themselves. Re-pointing the widget_* names here (the defaults in values/colors.xml
+     stay as the pre-12 fallback) makes the widget pick up the user's system colour without touching
+     the app itself, which stays One UI blue.
+
+     Suffix → tone: _0 = 100 (white) … _1000 = 0 (black); _600 = tone 40, _200 = tone 80 etc. The
+     roles below follow the M3 light scheme. The transport controls map to secondaryContainer /
+     on-secondary-container rather than a filled primary, because the full-screen player renders all
+     three as one neutral round family (bg_round_gray) and the widget follows it. -->
+<resources>
+    <!-- The app's opt-in Material You accent (Settings → "Material You colours"): M3 `primary` in
+         the light scheme, i.e. the wallpaper-derived accent1 at tone 40. Unlike the widget_* names
+         below this one only takes effect when the user turns the setting on. -->
+    <color name="app_primary_expressive">@android:color/system_accent1_600</color>
+
+    <!-- surfaceContainer-ish: a faintly wallpaper-tinted card, not flat white. -->
+    <color name="widget_surface">@android:color/system_accent2_50</color>
+    <color name="widget_surface_stroke">@android:color/system_accent2_100</color>
+    <!-- onSurface / onSurfaceVariant. -->
+    <color name="widget_text_primary">@android:color/system_neutral1_900</color>
+    <color name="widget_text_secondary">@android:color/system_neutral2_700</color>
+    <!-- secondaryContainer + onSecondaryContainer: the round circle behind every transport
+         control, and the glyph on it. -->
+    <color name="widget_control_container">@android:color/system_accent2_100</color>
+    <color name="widget_control">@android:color/system_accent1_700</color>
+    <!-- primary — progress fill only. -->
+    <color name="widget_accent">@android:color/system_accent1_600</color>
+    <color name="widget_progress_track">@android:color/system_accent2_100</color>
+    <color name="widget_art_placeholder">@android:color/system_accent2_100</color>
+    <color name="widget_icon_muted">@android:color/system_accent1_400</color>
+</resources>

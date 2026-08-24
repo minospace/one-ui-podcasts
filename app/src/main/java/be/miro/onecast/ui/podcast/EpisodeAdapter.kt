@@ -25,6 +25,7 @@ class EpisodeAdapter(
     private var podcast: Podcast? = null
     private var episodes: List<Episode> = emptyList()
     private var currentEpisodeId: Long? = null
+    private var downloadingIds: Set<Long> = emptySet()
     private var descriptionExpanded = false
     private val expandedEpisodeIds = mutableSetOf<Long>()
 
@@ -50,6 +51,17 @@ class EpisodeAdapter(
         currentEpisodeId = id
         previousId?.let { notifyIfPresent(it) }
         id?.let { notifyIfPresent(it) }
+    }
+
+    /**
+     * Which episodes are queued/downloading right now. Only the membership matters, not the byte
+     * counter, so rows rebind when a download starts or ends rather than on every progress tick.
+     */
+    fun setDownloadingIds(ids: Set<Long>) {
+        if (ids == downloadingIds) return
+        val changed = (ids - downloadingIds) + (downloadingIds - ids)
+        downloadingIds = ids
+        changed.forEach { notifyIfPresent(it) }
     }
 
     private fun notifyIfPresent(episodeId: Long) {
@@ -175,6 +187,11 @@ class EpisodeAdapter(
                         ?.let { parts += "$it left" }
                 }
             }
+            when {
+                episode.id in downloadingIds -> parts += "Downloading…"
+                episode.downloadPath != null -> parts += "Downloaded"
+            }
+            if (episode.hasVideo) parts += title.context.getString(R.string.video_label)
             return parts.joinToString("  ·  ")
         }
     }

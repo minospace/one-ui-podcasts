@@ -7,6 +7,7 @@ import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
@@ -52,20 +53,24 @@ class PlaybackService : MediaSessionService() {
             .setAllowCrossProtocolRedirects(true)
             .setConnectTimeoutMs(30_000)
             .setReadTimeoutMs(30_000)
+        // Wrapped so the tracking-redirect chain is walked once per URL rather than on every open
+        // (see RedirectCachingDataSource) — that chain is most of the wait before the first sound.
         val mediaSourceFactory = DefaultMediaSourceFactory(
-            DefaultDataSource.Factory(this, httpDataSourceFactory),
+            RedirectCachingDataSource.Factory(
+                DefaultDataSource.Factory(this, httpDataSourceFactory),
+            ),
         )
 
         // Start playback as soon as a small amount of audio is buffered instead of the Media3
-        // default 2.5s. Podcasts are low-bitrate speech, and their URLs redirect through several
-        // tracking/CDN hops before the first byte arrives, so the default threshold makes the very
-        // first play feel sluggish. Keep the (generous) steady-state buffer so playback stays
-        // smooth once it's going; only the initial/after-rebuffer start thresholds are lowered.
+        // default 2.5s. Podcasts are low-bitrate speech, so half a second of audio is a few KB —
+        // it arrives in the first packets after the connection is up, and waiting for more just
+        // adds dead time to every start. Keep the (generous) steady-state buffer so playback stays
+        // smooth once it's going, and refill more before resuming from an actual stall.
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
                 DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
-                /* bufferForPlaybackMs = */ 1_000,
+                /* bufferForPlaybackMs = */ 500,
                 /* bufferForPlaybackAfterRebufferMs = */ 2_000,
             )
             .setPrioritizeTimeOverSizeThresholds(true)
@@ -112,8 +117,7 @@ class PlaybackService : MediaSessionService() {
             if (player.currentMediaItem != null) return@launch
             val podcast = repository.getPodcast(episode.podcastId)
             val startAt = if (episode.isPlayed) 0L else episode.positionMs
-            player.setMediaItem(MediaItems.fromEpisode(episode, podcast), startAt.coerceAtLeast(0))
-            player.prepare()
+            VideoMode.load(player, episode, podcast, startAt, settings.preloadVideo)
         }
     }
 
@@ -141,8 +145,17 @@ class PlaybackService : MediaSessionService() {
 
     private val playerListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            val episodeId = MediaItems.episodeId(mediaItem) ?: -1L
+            // A new episode is always listened to, never watched. Guarded on the id because
+            // switching the *same* episode between its audio and video file also lands here.
+            if (episodeId != settings.lastEpisodeId) VideoMode.reset()
             // Remember what's loaded so it survives the service being killed while paused.
-            settings.lastEpisodeId = MediaItems.episodeId(mediaItem) ?: -1L
+            settings.lastEpisodeId = episodeId
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            // Video is an extra, not the episode: if its decoder fails, keep the audio going.
+            session?.player?.let { VideoMode.recoverFromError(it, error) }
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -180,8 +193,7 @@ class PlaybackService : MediaSessionService() {
         if (player.playbackState != Player.STATE_ENDED) return
         repository.removeFromQueue(nextId)
         val startAt = if (next.isPlayed) 0L else next.positionMs
-        player.setMediaItem(MediaItems.fromEpisode(next, podcast), startAt.coerceAtLeast(0))
-        player.prepare()
+        VideoMode.load(player, next, podcast, startAt, settings.preloadVideo)
         player.play()
     }
 

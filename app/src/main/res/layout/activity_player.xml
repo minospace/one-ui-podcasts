@@ -11,7 +11,9 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-<LinearLayout
+<!-- The player's vertical drags are taken here, anywhere on it, rather than by any one child
+     (see PlayerSheet) — hence the intercepting layout. -->
+<be.miro.onecast.ui.player.DragInterceptLayout
     android:id="@+id/player_content"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -19,7 +21,8 @@
     android:paddingHorizontal="24dp"
     android:paddingBottom="24dp">
 
-    <!-- Everything above the title is a single drag-to-dismiss zone. -->
+    <!-- Artwork and grabber. Also the measuring stick for how far the player slides up to make
+         room for the episode notes, so it stays one view even though it no longer owns a gesture. -->
     <LinearLayout
         android:id="@+id/player_drag_zone"
         android:layout_width="match_parent"
@@ -56,6 +59,29 @@
                 android:elevation="8dp"
                 android:scaleType="centerCrop"
                 android:transitionName="player_art" />
+
+            <!-- Takes the artwork's place while the user is watching (see PlayerActivity). -->
+            <be.miro.onecast.ui.player.VideoFrameLayout
+                android:id="@+id/player_video_frame"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@android:color/black"
+                android:elevation="8dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <TextureView
+                    android:id="@+id/player_video"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+
+                <ProgressBar
+                    android:id="@+id/player_video_progress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:visibility="gone" />
+            </be.miro.onecast.ui.player.VideoFrameLayout>
         </LinearLayout>
     </LinearLayout>
 
@@ -83,12 +109,19 @@
         android:textColor="?android:attr/textColorSecondary"
         android:textSize="14sp" />
 
+    <!-- Scrolls sideways: a long chapter title next to the video and Up Next chips can outgrow a
+         narrow screen. fillViewport keeps the row centred while it still fits. -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:fillViewport="true"
+        android:scrollbars="none">
+
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="14dp"
-        android:gravity="center_vertical"
+        android:gravity="center"
         android:orientation="horizontal">
 
         <Button
@@ -114,6 +147,26 @@
             tools:text="1. Introduction" />
 
         <Button
+            android:id="@+id/player_video_toggle"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_chip"
+            android:drawableStart="@drawable/ic_video"
+            android:drawablePadding="8dp"
+            android:drawableTint="?android:attr/textColorPrimary"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="16dp"
+            android:singleLine="true"
+            android:text="@string/video_show"
+            android:textAllCaps="false"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="13sp"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <Button
             android:id="@+id/player_up_next"
             style="?android:attr/borderlessButtonStyle"
             android:layout_width="wrap_content"
@@ -130,6 +183,7 @@
             android:textColor="?android:attr/textColorPrimary"
             android:textSize="13sp" />
     </LinearLayout>
+    </HorizontalScrollView>
 
     <SeekBar
         android:id="@+id/player_seekbar"
@@ -171,7 +225,7 @@
             android:id="@+id/player_skip_back"
             android:layout_width="56dp"
             android:layout_height="56dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/bg_round_gray"
             android:contentDescription="Skip back 15 seconds"
             android:src="@drawable/ic_skip_back"
             android:tint="?android:attr/textColorPrimary" />
@@ -181,18 +235,18 @@
             android:layout_width="72dp"
             android:layout_height="72dp"
             android:layout_marginHorizontal="28dp"
-            android:background="@drawable/bg_play_circle"
+            android:background="@drawable/bg_round_gray"
             android:contentDescription="Play or pause"
             android:padding="20dp"
             android:scaleType="fitCenter"
-            android:src="@drawable/ic_play"
-            android:tint="@color/app_on_primary" />
+            android:src="@drawable/ic_play_rounded"
+            android:tint="?android:attr/textColorPrimary" />
 
         <ImageButton
             android:id="@+id/player_skip_forward"
             android:layout_width="56dp"
             android:layout_height="56dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:background="@drawable/bg_round_gray"
             android:contentDescription="Skip forward 30 seconds"
             android:src="@drawable/ic_skip_forward"
             android:tint="?android:attr/textColorPrimary" />
@@ -231,5 +285,66 @@
             android:text="Mark played"
             android:textColor="?android:attr/textColorPrimary" />
     </LinearLayout>
-</LinearLayout>
+</be.miro.onecast.ui.player.DragInterceptLayout>
+
+    <!--
+        Episode notes, parked just off the bottom edge. Scrolling up on the player slides the
+        player content up by exactly the artwork's height and brings this into the space it
+        vacates (see PlayerSheet); its height is set from that same measurement.
+        INVISIBLE, not alpha 0, so it doesn't swallow taps meant for the controls underneath.
+    -->
+    <LinearLayout
+        android:id="@+id/player_info"
+        android:layout_width="match_parent"
+        android:layout_height="240dp"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:visibility="invisible"
+        tools:visibility="visible">
+
+        <TextView
+            android:id="@+id/player_info_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="24dp"
+            android:paddingBottom="10dp"
+            android:text="@string/episode_notes"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="19sp"
+            android:textStyle="bold" />
+
+        <ScrollView
+            android:id="@+id/player_info_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:paddingHorizontal="24dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/player_info_meta"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="12sp"
+                    tools:text="3 days ago · 52 min" />
+
+                <TextView
+                    android:id="@+id/player_info_description"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingMultiplier="1.15"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textColorLink="?attr/colorPrimary"
+                    android:textSize="14sp"
+                    tools:text="@string/episode_notes_empty" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
 </FrameLayout>

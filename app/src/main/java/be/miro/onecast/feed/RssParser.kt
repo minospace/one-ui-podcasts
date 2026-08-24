@@ -31,11 +31,15 @@ class RssParser {
         var itGuid: String? = null
         var itDesc: String? = null
         var itAudio: String? = null
+        var itVideo: String? = null
         var itPubDate = 0L
         var itDuration = 0L
         var itImage: String? = null
         var itChaptersUrl: String? = null
         val itChapters = mutableListOf<Chapter>()
+        // The mime type of the <podcast:alternateEnclosure> currently open, if any: its URL lives in
+        // a nested <podcast:source>, so the type has to be carried across to that tag.
+        var altEnclosureType: String? = null
 
         var text = StringBuilder()
         var event = parser.eventType
@@ -48,16 +52,49 @@ class RssParser {
                         name.equals("item", true) -> {
                             insideItem = true
                             itTitle = null; itGuid = null; itDesc = null; itAudio = null
-                            itPubDate = 0L; itDuration = 0L; itImage = null
-                            itChaptersUrl = null; itChapters.clear()
+                            itVideo = null; itPubDate = 0L; itDuration = 0L; itImage = null
+                            itChaptersUrl = null; itChapters.clear(); altEnclosureType = null
                         }
                         name.equals("enclosure", true) && insideItem -> {
-                            val type = parser.getAttributeValue(null, "type")
                             val url = parser.getAttributeValue(null, "url")
-                            if (url != null && itAudio == null &&
-                                (type == null || type.startsWith("audio", true))
+                            if (url != null) {
+                                val type = parser.getAttributeValue(null, "type")
+                                if (isVideo(type, url)) {
+                                    if (itVideo == null) itVideo = url
+                                } else if (itAudio == null && isAudio(type, url)) {
+                                    itAudio = url
+                                }
+                            }
+                        }
+                        // Podcasting 2.0: extra renditions of the same episode (e.g. a video cut
+                        // alongside the audio enclosure), each with its URL in a nested <source>.
+                        name.equals("podcast:alternateEnclosure", true) && insideItem -> {
+                            altEnclosureType = parser.getAttributeValue(null, "type").orEmpty()
+                        }
+                        name.equals("podcast:source", true) && altEnclosureType != null -> {
+                            // One alternate enclosure can list the same file several ways (https,
+                            // IPFS, torrent…); only a plain web URL is something the player can open.
+                            val url = parser.getAttributeValue(null, "uri")
+                                ?.takeIf { it.startsWith("http", true) }
+                            if (url != null) {
+                                if (isVideo(altEnclosureType, url)) {
+                                    if (itVideo == null) itVideo = url
+                                } else if (itAudio == null && isAudio(altEnclosureType, url)) {
+                                    // An audio rendition of a video episode: worth having, so
+                                    // listening (and downloading to listen) needn't carry video.
+                                    itAudio = url
+                                }
+                            }
+                        }
+                        // Media RSS, which some video podcasts use instead of a video enclosure.
+                        name.equals("media:content", true) && insideItem -> {
+                            val url = parser.getAttributeValue(null, "url")
+                            val medium = parser.getAttributeValue(null, "medium")
+                            val type = parser.getAttributeValue(null, "type")
+                            if (url != null && itVideo == null && !medium.equals("audio", true) &&
+                                (medium.equals("video", true) || isVideo(type, url))
                             ) {
-                                itAudio = url
+                                itVideo = url
                             }
                         }
                         name.equals("itunes:image", true) -> {
@@ -99,15 +136,20 @@ class RssParser {
                     val value = text.toString().trim()
                     if (insideItem) {
                         when {
+                            name.equals("podcast:alternateEnclosure", true) -> altEnclosureType = null
                             name.equals("item", true) -> {
                                 val audio = itAudio
-                                if (audio != null) {
+                                val video = itVideo
+                                // A video-only item still counts: it plays as audio until the user
+                                // switches to video.
+                                if (audio != null || video != null) {
                                     episodes.add(
                                         ParsedEpisode(
-                                            guid = itGuid ?: audio,
+                                            guid = itGuid ?: audio ?: video!!,
                                             title = itTitle ?: "(untitled)",
                                             description = itDesc,
                                             audioUrl = audio,
+                                            videoUrl = video,
                                             pubDate = itPubDate,
                                             durationMs = itDuration,
                                             imageUrl = itImage,
@@ -143,6 +185,39 @@ class RssParser {
 
         return ParsedFeed(channelTitle, channelAuthor, channelDescription, channelImage, episodes)
     }
+
+    /**
+     * Whether a media URL points at video. The feed's mime type decides when it says something
+     * useful; plenty of feeds send nothing (or `application/octet-stream`), so fall back to the
+     * file extension.
+     */
+    private fun isVideo(type: String?, url: String): Boolean = when {
+        type.isNullOrBlank() -> hasVideoExtension(url)
+        type.startsWith("video", true) -> true
+        type.startsWith("audio", true) -> false
+        else -> hasVideoExtension(url)
+    }
+
+    /**
+     * Whether a media URL points at the episode's audio. Deliberately a test in its own right and
+     * not merely "isn't video": an item can carry enclosures that are neither — a transcript, a
+     * chapters file — and taking one of those as the audio costs the episode its real enclosure
+     * (the first URL wins) and leaves it unplayable. An untyped enclosure is still taken at face
+     * value, since plenty of feeds ship the episode itself with no type at all.
+     */
+    private fun isAudio(type: String?, url: String): Boolean = when {
+        type.isNullOrBlank() -> true
+        type.startsWith("audio", true) -> true
+        type.startsWith("video", true) -> false
+        else -> hasAudioExtension(url)
+    }
+
+    private fun hasVideoExtension(url: String): Boolean = extensionOf(url) in VIDEO_EXTENSIONS
+
+    private fun hasAudioExtension(url: String): Boolean = extensionOf(url) in AUDIO_EXTENSIONS
+
+    private fun extensionOf(url: String): String =
+        url.substringBefore('?').substringBefore('#').substringAfterLast('.', "").lowercase()
 
     private fun parseDate(value: String): Long {
         if (value.isBlank()) return 0
@@ -191,6 +266,11 @@ class RssParser {
     }
 
     private companion object {
+        val VIDEO_EXTENSIONS = setOf("mp4", "m4v", "mov", "webm", "mkv", "avi", "mpg", "mpeg")
+
+        // Only consulted for an enclosure whose type says nothing useful (octet-stream and friends).
+        val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "aac", "ogg", "oga", "opus", "wav", "flac", "wma")
+
         val DATE_PATTERNS = listOf(
             "EEE, dd MMM yyyy HH:mm:ss Z",
             "EEE, dd MMM yyyy HH:mm:ss zzz",
