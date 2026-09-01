@@ -7,6 +7,7 @@ import be.miro.onecast.data.AppSettings
 import be.miro.onecast.data.PodcastRepository
 import be.miro.onecast.download.DownloadStore
 import be.miro.onecast.download.EpisodeDownloader
+import be.miro.onecast.local.LocalMediaStore
 
 /** Process-wide singletons (lightweight manual DI). */
 class OnecastApp : Application() {
@@ -15,12 +16,15 @@ class OnecastApp : Application() {
 
     private val downloadStore by lazy { DownloadStore(this) }
 
+    private val localStore by lazy { LocalMediaStore(this) }
+
     val repository by lazy {
         PodcastRepository(
             database.podcastDao(),
             database.episodeDao(),
             database.queueDao(),
             downloadStore,
+            localStore,
         )
     }
 

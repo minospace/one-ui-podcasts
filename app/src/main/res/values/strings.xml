@@ -71,6 +71,33 @@
     <string name="download_channel_progress">Downloads</string>
     <string name="download_channel_alerts">Download problems</string>
 
+    <!-- Custom podcasts -->
+    <string name="custom_create_title">Create a custom podcast</string>
+    <string name="custom_create_subtitle">Build your own feed from audio files on your phone</string>
+    <string name="custom_edit_title">Edit podcast</string>
+    <string name="custom_name_hint">Name</string>
+    <string name="custom_author_hint">Author (optional)</string>
+    <string name="custom_description_hint">Description (optional)</string>
+    <string name="custom_cover_choose">Choose a cover image</string>
+    <string name="custom_cover_change">Change cover image</string>
+    <string name="custom_name_required">Give the podcast a name first</string>
+    <string name="custom_save">Save</string>
+    <string name="custom_save_failed">Couldn\'t save the podcast</string>
+    <string name="custom_add_episodes">Add audio files</string>
+    <string name="custom_empty">No audio yet</string>
+    <string name="custom_empty_hint">Tap + to pick audio files from your phone. They\'re copied into Onecast, so they keep playing even if you move the originals.</string>
+    <string name="custom_importing">Adding files…</string>
+    <plurals name="custom_episodes_added">
+        <item quantity="one">%1$d file added</item>
+        <item quantity="other">%1$d files added</item>
+    </plurals>
+    <string name="custom_episodes_none_added">Couldn\'t read those files</string>
+    <string name="custom_episode_remove">Remove episode</string>
+    <string name="custom_episode_remove_message">Remove \"%1$s\" and delete its audio file?</string>
+    <string name="custom_episode_removed">Episode removed</string>
+    <string name="custom_delete_podcast">Delete podcast</string>
+    <string name="custom_delete_podcast_message">Delete \"%1$s\"? The audio files you added to it are deleted too.</string>
+
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="action_settings">Settings</string>

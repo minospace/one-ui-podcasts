@@ -175,7 +175,11 @@ class EpisodeAdapter(
 
         private fun buildMeta(episode: Episode): String {
             val parts = mutableListOf<String>()
-            Format.relativeDate(episode.pubDate).takeIf { it.isNotBlank() }?.let { parts += it }
+            // A local episode's date is only when the user imported the file — the same "today" on
+            // every row of a batch — so it says nothing worth a line of its own.
+            if (podcast?.isLocal != true) {
+                Format.relativeDate(episode.pubDate).takeIf { it.isNotBlank() }?.let { parts += it }
+            }
             Format.durationLabel(episode.durationMs).takeIf { it.isNotBlank() }?.let { parts += it }
             when {
                 episode.isPlayed -> parts += "Played"

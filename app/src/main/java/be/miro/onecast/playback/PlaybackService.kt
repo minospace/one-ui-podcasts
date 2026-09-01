@@ -151,6 +151,13 @@ class PlaybackService : MediaSessionService() {
             if (episodeId != settings.lastEpisodeId) VideoMode.reset()
             // Remember what's loaded so it survives the service being killed while paused.
             settings.lastEpisodeId = episodeId
+            // Unloaded rather than swapped — the episode was deleted out from under the player.
+            // Nothing else pushes widget state for a null item, so the widget would otherwise keep
+            // offering to play something that no longer exists.
+            if (mediaItem == null) {
+                WidgetState.clear(applicationContext)
+                WidgetState.notifyWidgets(applicationContext)
+            }
         }
 
         override fun onPlayerError(error: PlaybackException) {

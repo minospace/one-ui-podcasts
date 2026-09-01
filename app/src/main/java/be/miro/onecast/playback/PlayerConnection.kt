@@ -115,6 +115,13 @@ class PlayerConnection(
     fun isCurrent(episodeId: Long): Boolean =
         controller?.currentMediaItem?.mediaId == episodeId.toString()
 
+    /** Unload whatever is playing. Used when the episode's file is about to be deleted. */
+    fun clear() {
+        val c = controller ?: return
+        c.pause()
+        c.clearMediaItems()
+    }
+
     fun togglePlayPause() = withController { c ->
         if (c.isPlaying) c.pause() else c.play()
     }

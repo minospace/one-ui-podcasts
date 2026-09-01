@@ -39,7 +39,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Tap + to add one"
+            android:text="Tap + to search, paste a feed, or build your own"
             android:textColor="?android:attr/textColorSecondary"
             android:textSize="14sp" />
     </LinearLayout>

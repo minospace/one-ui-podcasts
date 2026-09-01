@@ -69,6 +69,11 @@ data class WidgetState(
             )
         }
 
+        /** Back to "nothing playing" — the episode that was loaded is gone (its files deleted). */
+        fun clear(context: Context) {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().apply()
+        }
+
         fun notifyWidgets(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, OnecastWidgetProvider::class.java))

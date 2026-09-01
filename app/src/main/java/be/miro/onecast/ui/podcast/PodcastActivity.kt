@@ -7,6 +7,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.app.ActivityOptionsCompat
@@ -21,6 +22,7 @@ import be.miro.onecast.databinding.ActivityPodcastBinding
 import be.miro.onecast.download.DownloadState
 import be.miro.onecast.playback.MediaItems
 import be.miro.onecast.ui.MediaActivity
+import be.miro.onecast.ui.custom.CustomPodcastActivity
 import be.miro.onecast.ui.downloads.DownloadsActivity
 import be.miro.onecast.ui.player.PlayerActivity
 import be.miro.onecast.ui.queue.QueueSheet
@@ -36,6 +38,30 @@ class PodcastActivity : MediaActivity() {
     private var episodes: List<Episode> = emptyList()
     private var hidePlayed = false
     private var queuedIds: Set<Long> = emptySet()
+
+    /** True for a podcast the user built themselves — no feed to refresh, files they can manage. */
+    private var isLocal = false
+
+    /**
+     * Pick audio files to add to a user-created podcast. Multiple at a time, kept in pick order.
+     * The files are copied into app storage, so the picker's short-lived read grant is enough.
+     */
+    private val pickAudio = registerForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        if (uris.isNullOrEmpty()) return@registerForActivityResult
+        toast(getString(R.string.custom_importing))
+        lifecycleScope.launch {
+            val added = repository.addLocalEpisodes(podcastId, uris)
+            toast(
+                if (added == 0) {
+                    getString(R.string.custom_episodes_none_added)
+                } else {
+                    resources.getQuantityString(R.plurals.custom_episodes_added, added, added)
+                },
+            )
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,6 +102,13 @@ class PodcastActivity : MediaActivity() {
                     repository.observePodcast(podcastId).collect { p ->
                         podcast = p
                         p?.let { binding.toolbarLayout.setTitle(it.title) }
+                        // A local podcast has a different menu and no pull-to-refresh; both only
+                        // need rebuilding when that actually changes, not on every row update.
+                        if (p != null && p.isLocal != isLocal) {
+                            isLocal = p.isLocal
+                            binding.swipeRefresh.isEnabled = !isLocal
+                            invalidateOptionsMenu()
+                        }
                         render()
                     }
                 }
@@ -111,8 +144,13 @@ class PodcastActivity : MediaActivity() {
 
     /** Push the (optionally filtered) episode list to the adapter. */
     private fun render() {
-        val visible = if (hidePlayed) episodes.filter { !it.isPlayed } else episodes
+        // A feed reads newest first; a podcast the user assembled reads in the order they added
+        // the files, which is what they picked.
+        val ordered = if (isLocal) episodes.sortedBy { it.pubDate } else episodes
+        val visible = if (hidePlayed) ordered.filter { !it.isPlayed } else ordered
         adapter.submit(podcast, visible)
+        binding.emptyView.visibility =
+            if (isLocal && episodes.isEmpty()) View.VISIBLE else View.GONE
     }
 
     /** Open the full player, growing the artwork out of the mini-player as a shared element. */
@@ -146,6 +184,9 @@ class PodcastActivity : MediaActivity() {
             popup.menu.add(0, MENU_ADD, 1, R.string.queue_add)
         }
         when {
+            // A local episode is already a file on the phone; there is nothing to download, and
+            // removing it is the action that makes sense there instead.
+            isLocal -> popup.menu.add(0, MENU_REMOVE_EPISODE, 2, R.string.custom_episode_remove)
             downloads.isPending(episode.id) ->
                 popup.menu.add(0, MENU_CANCEL_DOWNLOAD, 2, R.string.download_cancel_download)
             episode.downloadPath != null ->
@@ -168,6 +209,10 @@ class PodcastActivity : MediaActivity() {
                 }
                 MENU_DELETE_DOWNLOAD -> queueAction(episode, R.string.downloads_deleted) {
                     repository.deleteDownload(it)
+                }
+                MENU_REMOVE_EPISODE -> {
+                    confirmRemoveEpisode(episode)
+                    true
                 }
                 else -> false
             }
@@ -245,6 +290,13 @@ class PodcastActivity : MediaActivity() {
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         menu.findItem(R.id.action_hide_played)?.isChecked = hidePlayed
+        // A user-created podcast has files to add and no feed behind it, so it swaps refresh and
+        // unsubscribe for the actions that apply to something they own.
+        menu.findItem(R.id.action_refresh)?.isVisible = !isLocal
+        menu.findItem(R.id.action_unsubscribe)?.isVisible = !isLocal
+        menu.findItem(R.id.action_add_episodes)?.isVisible = isLocal
+        menu.findItem(R.id.action_edit_podcast)?.isVisible = isLocal
+        menu.findItem(R.id.action_delete_podcast)?.isVisible = isLocal
         return super.onPrepareOptionsMenu(menu)
     }
 
@@ -282,6 +334,18 @@ class PodcastActivity : MediaActivity() {
             confirmUnsubscribe()
             true
         }
+        R.id.action_add_episodes -> {
+            pickAudio.launch(arrayOf("audio/*"))
+            true
+        }
+        R.id.action_edit_podcast -> {
+            startActivity(CustomPodcastActivity.editIntent(this, podcastId))
+            true
+        }
+        R.id.action_delete_podcast -> {
+            confirmDeleteLocalPodcast()
+            true
+        }
         else -> false
     }
 
@@ -315,6 +379,39 @@ class PodcastActivity : MediaActivity() {
             .show()
     }
 
+    private fun confirmRemoveEpisode(episode: Episode) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.custom_episode_remove)
+            .setMessage(getString(R.string.custom_episode_remove_message, episode.title))
+            .setPositiveButton(R.string.custom_episode_remove) { _, _ ->
+                lifecycleScope.launch {
+                    // The file goes with the row, so don't leave the player pointing at it.
+                    if (playerConnection.isCurrent(episode.id)) playerConnection.clear()
+                    repository.deleteLocalEpisode(episode.id)
+                    toast(getString(R.string.custom_episode_removed))
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun confirmDeleteLocalPodcast() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.custom_delete_podcast)
+            .setMessage(
+                getString(R.string.custom_delete_podcast_message, podcast?.title ?: "this podcast"),
+            )
+            .setPositiveButton(R.string.custom_delete_podcast) { _, _ ->
+                lifecycleScope.launch {
+                    if (episodes.any { playerConnection.isCurrent(it.id) }) playerConnection.clear()
+                    repository.unsubscribe(podcastId)
+                    finish()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 
     companion object {
@@ -325,6 +422,7 @@ class PodcastActivity : MediaActivity() {
         private const val MENU_DOWNLOAD = 4
         private const val MENU_CANCEL_DOWNLOAD = 5
         private const val MENU_DELETE_DOWNLOAD = 6
+        private const val MENU_REMOVE_EPISODE = 7
 
         fun start(context: Context, podcastId: Long) {
             context.startActivity(

@@ -5,6 +5,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -12,6 +13,8 @@ import be.miro.onecast.databinding.ActivitySearchBinding
 import be.miro.onecast.podcastRepository
 import be.miro.onecast.ui.AmoledTheme
 import be.miro.onecast.ui.ExpressiveTheme
+import be.miro.onecast.ui.custom.CustomPodcastActivity
+import be.miro.onecast.ui.podcast.PodcastActivity
 import kotlinx.coroutines.launch
 
 /** Add a podcast by searching the iTunes directory or pasting an RSS feed URL. */
@@ -21,6 +24,20 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var adapter: SearchResultAdapter
     private var amoledApplied = false
     private var expressiveApplied = false
+
+    /**
+     * Land on the new podcast once it's created, with Home behind it — this screen has done its
+     * job, and the next step is adding audio to it.
+     */
+    private val createCustom = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val id = result.data?.getLongExtra(CustomPodcastActivity.EXTRA_PODCAST_ID, 0L) ?: 0L
+        if (result.resultCode == RESULT_OK && id != 0L) {
+            PodcastActivity.start(this, id)
+            finish()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,6 +63,10 @@ class SearchActivity : AppCompatActivity() {
                 false
             }
         }
+        binding.createCustom.setOnClickListener {
+            createCustom.launch(CustomPodcastActivity.createIntent(this))
+        }
+
         binding.searchInput.requestFocus()
     }
 

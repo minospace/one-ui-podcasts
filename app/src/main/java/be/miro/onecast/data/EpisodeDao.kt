@@ -28,9 +28,23 @@ interface EpisodeDao {
     )
     suspend fun newerUnplayed(podcastId: Long, afterPubDate: Long): List<Episode>
 
+    /**
+     * The newest publication date in a podcast, or null when it has no episodes. Used to stamp
+     * freshly imported local files so they land after everything already there, in pick order.
+     */
+    @Query("SELECT MAX(pubDate) FROM episodes WHERE podcastId = :podcastId")
+    suspend fun maxPubDate(podcastId: Long): Long?
+
     /** Only new items are written; existing (podcastId, guid) rows are kept as-is. */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(episodes: List<Episode>): List<Long>
+
+    /**
+     * Drops a single episode. Only ever used on a local podcast's episodes — a feed episode would
+     * come straight back on the next refresh. The queue row goes with it (foreign key cascade).
+     */
+    @Query("DELETE FROM episodes WHERE id = :id")
+    suspend fun deleteById(id: Long)
 
     /** Marking played also clears the resume position so it won't auto-resume. */
     @Query(

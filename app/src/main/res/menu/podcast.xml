@@ -8,6 +8,18 @@
         android:title="Refresh"
         app:showAsAction="ifRoom" />
 
+    <!-- Both only ever visible for a user-created podcast (see PodcastActivity). -->
+    <item
+        android:id="@+id/action_add_episodes"
+        android:icon="@drawable/ic_add"
+        android:title="@string/custom_add_episodes"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_edit_podcast"
+        android:title="@string/custom_edit_title"
+        app:showAsAction="never" />
+
     <item
         android:id="@+id/action_queue"
         android:icon="@drawable/ic_queue"
@@ -39,5 +51,10 @@
     <item
         android:id="@+id/action_unsubscribe"
         android:title="Unsubscribe"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_delete_podcast"
+        android:title="@string/custom_delete_podcast"
         app:showAsAction="never" />
 </menu>

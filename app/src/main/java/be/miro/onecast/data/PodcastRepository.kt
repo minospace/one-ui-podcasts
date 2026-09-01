@@ -1,14 +1,17 @@
 package be.miro.onecast.data
 
+import android.net.Uri
 import be.miro.onecast.download.DownloadStore
 import be.miro.onecast.feed.ChaptersClient
 import be.miro.onecast.feed.FeedFetcher
 import be.miro.onecast.feed.ItunesSearchClient
 import be.miro.onecast.feed.ParsedFeed
 import be.miro.onecast.feed.PodcastSearchResult
+import be.miro.onecast.local.LocalMediaStore
 import kotlinx.coroutines.flow.Flow
 import okhttp3.OkHttpClient
 import java.io.File
+import java.util.UUID
 
 /** Single source of truth: wraps the DAOs and the network feed/search clients. */
 class PodcastRepository(
@@ -16,6 +19,7 @@ class PodcastRepository(
     private val episodeDao: EpisodeDao,
     private val queueDao: QueueDao,
     private val downloadStore: DownloadStore,
+    private val localStore: LocalMediaStore,
     httpClient: OkHttpClient = OkHttpClient(),
 ) {
     private val feedFetcher = FeedFetcher(httpClient)
@@ -59,6 +63,9 @@ class PodcastRepository(
     /** Re-fetch a subscribed feed and add any new episodes. */
     suspend fun refresh(podcastId: Long) {
         val podcast = podcastDao.getById(podcastId) ?: return
+        // A user-created podcast has no feed behind it; its episodes only change when the user
+        // adds or removes files.
+        if (podcast.isLocal) return
         val parsed = feedFetcher.fetch(podcast.feedUrl)
         updatePodcastFromFeed(podcast, parsed)
         insertNewEpisodes(podcastId, parsed)
@@ -68,6 +75,7 @@ class PodcastRepository(
     suspend fun refreshStalePodcasts(maxAgeMs: Long = 30 * 60 * 1000L) {
         val now = System.currentTimeMillis()
         for (podcast in podcastDao.getAll()) {
+            if (podcast.isLocal) continue
             if (now - podcast.lastRefreshed < maxAgeMs) continue
             try {
                 refresh(podcast.id)
@@ -82,6 +90,91 @@ class PodcastRepository(
             downloadStore.delete(episode.downloadPath)
         }
         podcastDao.deleteById(podcastId)
+        // Harmless for a subscribed feed (it owns no local directory), so it needn't be guarded.
+        localStore.deleteForPodcast(podcastId)
+    }
+
+    // ── User-created podcasts ──────────────────────────────────────────────
+
+    /**
+     * Creates or updates a podcast the user is building themselves. Pass a [podcastId] of 0 to
+     * create one; [artworkUri] is a freshly picked image to copy in, or null to keep the current
+     * cover.
+     *
+     * Returns the podcast id, which for a create is the newly assigned one.
+     */
+    suspend fun saveLocalPodcast(
+        podcastId: Long,
+        title: String,
+        author: String?,
+        description: String?,
+        artworkUri: Uri?,
+    ): Long {
+        val id = if (podcastId == 0L) {
+            podcastDao.insert(
+                Podcast(
+                    // Nothing ever fetches this; it exists so the unique feedUrl index has
+                    // something distinct to hold for every user-created podcast.
+                    feedUrl = "$LOCAL_FEED_PREFIX${UUID.randomUUID()}",
+                    title = title,
+                    lastRefreshed = System.currentTimeMillis(),
+                    isLocal = true,
+                ),
+            )
+        } else {
+            podcastId
+        }
+        val existing = podcastDao.getById(id) ?: return id
+        // Copy the new cover in before the old one goes, so a failed import leaves the current
+        // artwork intact rather than none at all.
+        val artwork = artworkUri?.let { localStore.importImage(id, it) }
+            ?.also { localStore.deleteOwned(existing.artworkUrl) }
+        podcastDao.update(
+            existing.copy(
+                title = title,
+                author = author,
+                description = description,
+                artworkUrl = artwork ?: existing.artworkUrl,
+            ),
+        )
+        return id
+    }
+
+    /**
+     * Copies picked audio files into a user-created podcast, in the order they were picked, and
+     * returns how many landed. Files that can't be read are skipped rather than failing the batch.
+     */
+    suspend fun addLocalEpisodes(podcastId: Long, uris: List<Uri>): Int {
+        val podcast = podcastDao.getById(podcastId) ?: return 0
+        if (!podcast.isLocal) return 0
+        // Stamped after everything already in the podcast (and never in the past), one millisecond
+        // apart, so the list keeps the order the user picked them in.
+        var pubDate = maxOf(episodeDao.maxPubDate(podcastId) ?: 0L, System.currentTimeMillis())
+        val episodes = uris.mapNotNull { uri ->
+            localStore.importAudio(podcastId, uri)?.let { imported ->
+                Episode(
+                    podcastId = podcastId,
+                    guid = "$LOCAL_GUID_PREFIX${UUID.randomUUID()}",
+                    title = imported.title,
+                    audioUrl = imported.fileUri,
+                    pubDate = ++pubDate,
+                    durationMs = imported.durationMs,
+                    imageUrl = imported.artworkUri,
+                )
+            }
+        }
+        episodeDao.insertAll(episodes)
+        return episodes.size
+    }
+
+    /** Removes one episode of a user-created podcast, and the files that came with it. */
+    suspend fun deleteLocalEpisode(episodeId: Long) {
+        val episode = episodeDao.getById(episodeId) ?: return
+        downloadStore.delete(episode.downloadPath)
+        localStore.deleteOwned(episode.audioUrl)
+        localStore.deleteOwned(episode.imageUrl)
+        // The Up Next row goes with it (foreign key cascade).
+        episodeDao.deleteById(episodeId)
     }
 
     // ── Downloads ──────────────────────────────────────────────────────────
@@ -239,5 +332,10 @@ class PodcastRepository(
                 episodeDao.backfillVideo(podcastId, e.guid, e.videoUrl)
             }
         }
+    }
+
+    private companion object {
+        const val LOCAL_FEED_PREFIX = "onecast:local/"
+        const val LOCAL_GUID_PREFIX = "onecast:local-episode/"
     }
 }
