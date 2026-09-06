@@ -7,9 +7,11 @@
          Up Next queue caps out instead of pushing the sheet to full screen. -->
     <dimen name="sheet_list_max_height">420dp</dimen>
 
-    <!-- Home-screen widget corner radii. On API 31+ the card radius is overridden in values-v31 to
-         the launcher-supplied system_app_widget_background_radius, so the widget's corners match
-         every other widget on the home screen (Material You). This is the pre-12 fallback. -->
-    <dimen name="widget_card_radius">24dp</dimen>
+    <!-- Home-screen widget corner radii. The card radius is deliberately larger than the widget
+         will ever be tall: Android clamps a shape's corner radius to half its shortest side, so
+         this forces a full pill/stadium end on every widget size instead of the ~24-28dp rounded
+         rect the platform's own system_app_widget_background_radius caps out at (that read as
+         rectangular, not the pill look Samsung's own compact widgets have). -->
+    <dimen name="widget_card_radius">200dp</dimen>
     <dimen name="widget_art_radius">16dp</dimen>
 </resources>

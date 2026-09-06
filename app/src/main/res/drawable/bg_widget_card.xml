@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Rounded card the whole widget sits on. Concrete surface + stroke colours (day/night qualified,
      Material You dynamic on API 31+) so it renders identically regardless of the host launcher's
-     theme; the radius follows the launcher's own widget radius on API 31+ (see values/dimens.xml). -->
+     theme; the radius is oversized to force a pill shape (see values/dimens.xml). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <solid android:color="@color/widget_surface" />
